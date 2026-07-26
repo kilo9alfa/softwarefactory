@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+*.lock
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.tgz
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime
+tmp/
+temp/
+.tmp/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
