@@ -8,4 +8,9 @@
 test: bash tests/smoke.sh
 
 # staging_url:            # (later) smoke-tested after a staging deploy
-# deploy:                 # (later, stage 5) production deploy command
+
+# Stage 5 (sf-prod.sh, human-triggered): production deploy command, run in the
+# issue's worktree. Exit 0 = deployed (→ sf:deployed, issue closed), non-zero =
+# failed (→ sf:deploy-failed). softwarefactory has no real prod target, so this
+# is a safe placeholder that reports the plugin version.
+deploy: bash tests/smoke.sh && echo "🚀 softwarefactory has no production target — placeholder deploy OK ($(bash scripts/sf-version.sh 2>/dev/null || echo 'version n/a'))"
