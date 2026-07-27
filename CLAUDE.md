@@ -4,7 +4,7 @@
 
 The Software Factory is an autonomous feedback-to-production pipeline built as a Claude Code plugin.
 
-**Design Document:** [2026.07.26.Software_Factory_Design.md](2026.07.26.Software_Factory_Design.md)
+**Design Document:** [docs/2026.07.26.Software_Factory_Design.md](docs/2026.07.26.Software_Factory_Design.md)
 
 ## Current Phase: 2 (Autonomous Specs & Tickets)
 

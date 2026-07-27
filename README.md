@@ -10,7 +10,7 @@ The Software Factory accelerates the journey from user feedback to deployed feat
 
 ## Quick Start
 
-- **Design Document:** [2026.07.26.Software_Factory_Design.md](2026.07.26.Software_Factory_Design.md) — Complete architecture, advantages, risks, roadmap
+- **Design Document:** [docs/2026.07.26.Software_Factory_Design.md](docs/2026.07.26.Software_Factory_Design.md) — Complete architecture, advantages, risks, roadmap
 - **Status:** Phase 1 (foundation) — Building feedback endpoint & `/sf-tospecs` skill
 
 ## Pipeline Stages
@@ -50,8 +50,8 @@ User Feedback → Classify & Issue → Specs (auto) → Tickets (auto) → Plan 
 ```
 softwarefactory/
 ├── README.md                              # This file
-├── 2026.07.26.Software_Factory_Design.md  # Full design document
 ├── docs/                                  # Documentation
+│   ├── 2026.07.26.Software_Factory_Design.md  # Full design document
 │   ├── architecture/                      # Architecture docs
 │   ├── runbooks/                          # Operations runbooks
 │   └── examples/                          # Example workflows
