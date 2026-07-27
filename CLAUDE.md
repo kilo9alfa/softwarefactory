@@ -6,17 +6,30 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Design Document:** [2026.07.26.Software_Factory_Design.md](2026.07.26.Software_Factory_Design.md)
 
-## Current Phase: 1 (Foundation)
+## Current Phase: 2 (Autonomous Specs & Tickets)
 
 ### What's Built
 
+**Foundation & distribution**
 - ✅ Installable plugin (`.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` — repo is its own marketplace)
-- ✅ `sf-triage` skill (classify feedback: bug vs feature vs spam) — invoked as `/softwarefactory:sf-triage <n>`
-- ✅ `sf-apply-label.sh` (trusted state-transition step: validates classification, swaps label, rewrites title, closes spam)
-- ✅ `sf-dispatcher.sh` (poll for feedback/triage, spawn tmux agents, apply label after triage)
 - ✅ `sf-dev-sync.sh` (refresh installed plugin from working tree during development)
 - ✅ Systemd service + timer (run dispatcher every 5 min on Nuclaw)
-- ✅ GitHub labels (feedback/triage → feedback/bug|feature|sf:spam)
+
+**Skills (advisory-only — never write to GitHub)** — invoked namespaced, e.g. `/softwarefactory:sf-triage <n>`
+- ✅ `sf-triage` (Haiku) — classify feedback: bug vs feature vs spam
+- ✅ `sf-tospecs` (Sonnet) — classified issue → structured spec (emits `<!--SPEC-->` block)
+- ✅ `sf-totickets` (Opus) — spec → vertical-slice tickets (emits format-agnostic JSON)
+
+**Trusted scripts (do every label transition; validate the skill's advisory output)**
+- ✅ `sf-apply-label.sh` — triage → `feedback/bug`\|`feature`\|`sf:spam` (rewrites title, closes spam)
+- ✅ `sf-apply-spec.sh` — extracts spec, posts comment, **+**`sf:spec`
+- ✅ `sf-apply-tickets.sh` — parses JSON, renders dependency-ordered checklist, **+**`sf:tickets`
+- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets on their trigger labels
+
+**State machine**
+- ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` (`sf:*` are additive; classification kept as permanent metadata)
+
+> Full stage-by-stage build map: see the **Implementation Manifest** table in the design doc.
 
 ## Installation (plugin)
 

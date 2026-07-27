@@ -1,119 +1,129 @@
 #!/bin/bash
 set -euo pipefail
 
-# Software Factory Dispatcher
-# Polls GitHub for feedback/triage issues and spawns autonomous triage agents
-# Runs in tmux on Nuclaw via systemd timer
+# Software Factory Dispatcher (multi-stage)
+# Polls GitHub and spawns the right autonomous agent per pipeline stage.
+# Runs in tmux on Nuclaw via systemd timer.
+#
+# Each stage is: trigger label(s) -> skill (claude -p, advisory) -> apply script
+# (trusted, does the label transition). The apply scripts also guard themselves,
+# so a dispatcher race can never drive a wrong-stage transition.
+#
+# Stage table (processed in order each cycle):
+#   triage : feedback/triage                 -> sf-triage    -> sf-apply-label.sh   (done: feedback/bug|feature|sf:spam)
+#   spec   : feedback/bug | feedback/feature -> sf-tospecs   -> sf-apply-spec.sh    (done: sf:spec)
+#   tickets: sf:spec                         -> sf-totickets -> sf-apply-tickets.sh (done: sf:tickets)
 
-REPO="kilo9alfa/softwarefactory"
-TMUX_PREFIX="sf-triage"
+REPO="${SF_REPO:-kilo9alfa/softwarefactory}"
+REPO_DIR="${SF_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 RETRY_MAX=3
-SESSION_TIMEOUT=600  # 10 minutes
+SESSION_TIMEOUT=900  # 15 minutes — spec/tickets explore the codebase
 
-# Create log directory
 mkdir -p "$LOG_DIR"
 
 log() {
     echo "[$(date '+%Y.%m.%d %H:%M:%S')] $*" | tee -a "$LOG_DIR/dispatcher.log"
 }
 
-# Check if tmux session exists
 session_exists() {
-    local session_name="$1"
-    tmux has-session -t "$session_name" 2>/dev/null || return 1
+    tmux has-session -t "$1" 2>/dev/null || return 1
 }
 
-# Check if issue already has a result label (not feedback/triage anymore)
-has_result_label() {
-    local issue_num="$1"
-    local labels
-    labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-
-    # If it has any of these labels, skip processing
-    if echo "$labels" | grep -qE "^feedback/(bug|feature)$|^sf:spam$"; then
-        return 0  # has result
-    fi
-    return 1  # no result yet
+# True if the issue already carries any of the stage's "done" labels.
+has_any_label() {
+    local labels="$1"; shift
+    local want
+    for want in "$@"; do
+        echo "$labels" | grep -qx "$want" && return 0
+    done
+    return 1
 }
 
-# Check retry count from issue comments
-get_retry_count() {
-    local issue_num="$1"
-    gh issue view "$issue_num" --repo "$REPO" --json comments --jq '.comments | length' 2>/dev/null || echo "0"
-}
-
-# Spawn triage agent in tmux
-spawn_agent() {
-    local issue_num="$1"
-    local session_name="${TMUX_PREFIX}-${issue_num}"
-    local log_file="$LOG_DIR/triage-${issue_num}.log"
-
-    # Check if session already exists (idempotency)
-    if session_exists "$session_name"; then
-        log "Session $session_name already running, skipping"
-        return 0
-    fi
-
-    # Check if already processed
-    if has_result_label "$issue_num"; then
-        log "Issue #$issue_num already classified, skipping"
-        return 0
-    fi
-
-    # Check retry count
-    local retries
-    retries=$(get_retry_count "$issue_num")
-    if (( retries >= RETRY_MAX )); then
-        log "Issue #$issue_num exceeded retry limit ($RETRY_MAX), marking as unclear"
-        gh issue comment "$issue_num" --repo "$REPO" --body "⚠️ Triage agent couldn't classify this issue after $RETRY_MAX attempts. Please add more details." 2>/dev/null || true
+# Attempt counter (machine-local). Prevents infinite relaunch of a failing stage.
+attempts_ok() {
+    local marker="$LOG_DIR/$1.attempts"
+    local n=0
+    [ -f "$marker" ] && n=$(cat "$marker" 2>/dev/null || echo 0)
+    if (( n >= RETRY_MAX )); then
         return 1
     fi
-
-    # Create tmux session and run triage agent
-    log "Spawning triage agent for issue #$issue_num in session $session_name"
-
-    tmux new-session -d -s "$session_name" -x 200 -y 50 \
-        "cd ${HOME}/code/softwarefactory && \
-         claude --dangerously-skip-permissions -p '/softwarefactory:sf-triage $issue_num' 2>&1 | tee $log_file; \
-         bash ${HOME}/code/softwarefactory/scripts/sf-apply-label.sh $issue_num $log_file; \
-         tmux kill-session -t $session_name"
-
-    # Set session timeout (kill after N seconds if still running)
-    (
-        sleep "$SESSION_TIMEOUT"
-        if session_exists "$session_name"; then
-            log "Session $session_name timeout after $SESSION_TIMEOUT seconds, killing"
-            tmux kill-session -t "$session_name" 2>/dev/null || true
-        fi
-    ) &
-
+    echo $(( n + 1 )) > "$marker"
     return 0
 }
 
-# Main loop
-main() {
-    log "Software Factory Dispatcher started (PID $$)"
+# Spawn one stage's agent for one issue.
+#   $1 stage  $2 skill  $3 apply_script  $4 issue_num
+spawn() {
+    local stage="$1" skill="$2" apply_script="$3" issue_num="$4"
+    local session_name="sf-${stage}-${issue_num}"
+    local log_file="$LOG_DIR/${stage}-${issue_num}.log"
 
-    # Fetch all feedback/triage issues
-    local issues
-    issues=$(gh issue list --repo "$REPO" --label "feedback/triage" --json number --jq '.[].number' 2>/dev/null || echo "")
-
-    if [ -z "$issues" ]; then
-        log "No feedback/triage issues found"
+    if session_exists "$session_name"; then
+        log "[$stage] session $session_name already running, skipping #$issue_num"
         return 0
     fi
+    if ! attempts_ok "${stage}-${issue_num}"; then
+        log "[$stage] #$issue_num exceeded retry limit ($RETRY_MAX), skipping"
+        return 1
+    fi
 
-    log "Found $(echo "$issues" | wc -l) feedback/triage issue(s): $issues"
+    log "[$stage] spawning agent for #$issue_num in $session_name"
+    tmux new-session -d -s "$session_name" -x 200 -y 50 \
+        "cd ${REPO_DIR} && \
+         claude --dangerously-skip-permissions -p '/softwarefactory:${skill} ${issue_num}' 2>&1 | tee ${log_file}; \
+         bash ${REPO_DIR}/scripts/${apply_script} ${issue_num} ${log_file}; \
+         tmux kill-session -t ${session_name}"
 
-    # Process each issue
+    # Watchdog: kill a hung session after the timeout.
+    (
+        sleep "$SESSION_TIMEOUT"
+        if session_exists "$session_name"; then
+            log "[$stage] session $session_name timeout (${SESSION_TIMEOUT}s), killing"
+            tmux kill-session -t "$session_name" 2>/dev/null || true
+        fi
+    ) &
+}
+
+# Process one stage across all matching open issues.
+#   $1 stage  $2 skill  $3 apply_script  $4 "trigger labels (space-sep, OR)"  $5 "done labels (space-sep, any=skip)"
+process_stage() {
+    local stage="$1" skill="$2" apply_script="$3" trigger_labels="$4" done_labels="$5"
+
+    # Gather candidate issue numbers across all trigger labels (OR), deduped.
+    local issues="" label
+    for label in $trigger_labels; do
+        local found
+        found=$(gh issue list --repo "$REPO" --state open --label "$label" --json number --jq '.[].number' 2>/dev/null || echo "")
+        issues="${issues}"$'\n'"${found}"
+    done
+    issues=$(echo "$issues" | grep -E '^[0-9]+$' | sort -u || echo "")
+
+    [ -z "$issues" ] && return 0
+    log "[$stage] candidates: $(echo "$issues" | tr '\n' ' ')"
+
+    local issue_num
     while IFS= read -r issue_num; do
         [ -z "$issue_num" ] && continue
-        spawn_agent "$issue_num" || log "Failed to spawn agent for issue #$issue_num"
+        local labels
+        labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+        # shellcheck disable=SC2086
+        if has_any_label "$labels" $done_labels; then
+            log "[$stage] #$issue_num already has a done label, skipping"
+            continue
+        fi
+        spawn "$stage" "$skill" "$apply_script" "$issue_num" || log "[$stage] failed to spawn for #$issue_num"
     done <<< "$issues"
+}
+
+main() {
+    log "Dispatcher started (PID $$) repo=$REPO dir=$REPO_DIR"
+
+    process_stage "triage"  "sf-triage"    "sf-apply-label.sh"   "feedback/triage"                 "feedback/bug feedback/feature sf:spam"
+    process_stage "spec"    "sf-tospecs"   "sf-apply-spec.sh"    "feedback/bug feedback/feature"   "sf:spec"
+    process_stage "tickets" "sf-totickets" "sf-apply-tickets.sh" "sf:spec"                         "sf:tickets"
 
     log "Dispatcher cycle complete"
 }
 
-# Run main
 main "$@"
