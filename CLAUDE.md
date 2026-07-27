@@ -6,7 +6,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Design Document:** [docs/2026.07.26.Software_Factory_Design.md](docs/2026.07.26.Software_Factory_Design.md)
 
-## Current Phase: 2 (Autonomous Specs & Tickets)
+## Current Phase: 3a (Autonomous Planning + Approval Gate)
 
 ### What's Built
 
@@ -19,15 +19,19 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-triage` (Haiku) — classify feedback: bug vs feature vs spam
 - ✅ `sf-tospecs` (Sonnet) — classified issue → structured spec (emits `<!--SPEC-->` block)
 - ✅ `sf-totickets` (Opus) — spec → vertical-slice tickets (emits format-agnostic JSON)
+- ✅ `sf-plan` (Fable 5) — spec + tickets → implementation plan (emits `<!--PLAN-->` block)
 
 **Trusted scripts (do every label transition; validate the skill's advisory output)**
 - ✅ `sf-apply-label.sh` — triage → `feedback/bug`\|`feature`\|`sf:spam` (rewrites title, closes spam)
 - ✅ `sf-apply-spec.sh` — extracts spec, posts comment, **+**`sf:spec`
 - ✅ `sf-apply-tickets.sh` — parses JSON, renders dependency-ordered checklist, **+**`sf:tickets`
-- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets on their trigger labels
+- ✅ `sf-apply-plan.sh` — extracts plan, posts comment, **+**`sf:plan-review` (parks at approval gate)
+- ✅ `sf-approve-plan.sh` — **human approval action**: `sf:plan-review` → **+**`sf:plan-approved`
+- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan; never advances past `sf:plan-review`
 
 **State machine**
-- ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` (`sf:*` are additive; classification kept as permanent metadata)
+- ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` (`sf:*` are additive; classification kept as permanent metadata)
+- **Approval gate:** plan *generation* is autonomous; plan *approval* is human-only — a person adds `sf:plan-approved` (via `sf-approve-plan.sh <N>`) after reading the plan. The dispatcher parks at `sf:plan-review`.
 
 > Full stage-by-stage build map: see the **Implementation Manifest** table in the design doc.
 
@@ -82,8 +86,10 @@ Commands are namespaced by plugin. Invoke the skill as **`/softwarefactory:sf-tr
 | `feedback/bug` | Red | Classified as bug | `/sf-triage` agent |
 | `feedback/feature` | Blue | Classified as feature request | `/sf-triage` agent |
 | `sf:spam` | Orange | Classified as spam | `/sf-triage` agent |
-| `sf:spec` | Cyan | Spec generation in progress/done | (Future: `/sf-tospecs` agent) |
-| `sf:tickets` | Yellow | Tickets broken down | (Future: `/sf-totickets` agent) |
+| `sf:spec` | Cyan | Spec generated | `/sf-tospecs` → `sf-apply-spec.sh` |
+| `sf:tickets` | Yellow | Tickets broken down | `/sf-totickets` → `sf-apply-tickets.sh` |
+| `sf:plan-review` | Purple | Plan generated, **awaiting human approval** | `/sf-plan` → `sf-apply-plan.sh` |
+| `sf:plan-approved` | Green | Human approved the plan; ready for dev | **Human** → `sf-approve-plan.sh` |
 
 ## Git Identity
 

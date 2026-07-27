@@ -13,6 +13,10 @@ set -euo pipefail
 #   triage : feedback/triage                 -> sf-triage    -> sf-apply-label.sh   (done: feedback/bug|feature|sf:spam)
 #   spec   : feedback/bug | feedback/feature -> sf-tospecs   -> sf-apply-spec.sh    (done: sf:spec)
 #   tickets: sf:spec                         -> sf-totickets -> sf-apply-tickets.sh (done: sf:tickets)
+#   plan   : sf:tickets                      -> sf-plan      -> sf-apply-plan.sh    (done: sf:plan-review|sf:plan-approved)
+#
+# Plan GENERATION is autonomous; plan APPROVAL is human-only (sf-approve-plan.sh
+# adds sf:plan-approved). The dispatcher never advances past sf:plan-review.
 
 REPO="${SF_REPO:-kilo9alfa/softwarefactory}"
 REPO_DIR="${SF_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -122,6 +126,7 @@ main() {
     process_stage "triage"  "sf-triage"    "sf-apply-label.sh"   "feedback/triage"                 "feedback/bug feedback/feature sf:spam"
     process_stage "spec"    "sf-tospecs"   "sf-apply-spec.sh"    "feedback/bug feedback/feature"   "sf:spec"
     process_stage "tickets" "sf-totickets" "sf-apply-tickets.sh" "sf:spec"                         "sf:tickets"
+    process_stage "plan"    "sf-plan"      "sf-apply-plan.sh"    "sf:tickets"                      "sf:plan-review sf:plan-approved"
 
     log "Dispatcher cycle complete"
 }
