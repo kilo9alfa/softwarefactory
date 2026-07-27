@@ -34,8 +34,11 @@ wt=$(bash "$SCRIPT_DIR/sf-prep-worktree.sh" "$issue_num" 2>>"$LOG_DIR/dispatcher
 
 # Read the test command from the branch's .sf.yml.
 test_cmd=$(sed -n 's/^test:[[:space:]]*//p' "$wt/.sf.yml" 2>/dev/null | head -1)
-test_cmd="${test_cmd%\"}"; test_cmd="${test_cmd#\"}"
-test_cmd="${test_cmd%\'}"; test_cmd="${test_cmd#\'}"
+# Strip surrounding quotes ONLY if the whole value is a matching quoted pair.
+case "$test_cmd" in
+    \"*\") test_cmd="${test_cmd#\"}"; test_cmd="${test_cmd%\"}" ;;
+    \'*\') test_cmd="${test_cmd#\'}"; test_cmd="${test_cmd%\'}" ;;
+esac
 
 if [ -z "$test_cmd" ]; then
     log "Issue #$issue_num: no .sf.yml 'test:' command — cannot gate, leaving sf:implemented"
