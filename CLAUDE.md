@@ -29,6 +29,11 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-approve-plan.sh` — **human approval action**: `sf:plan-review` → **+**`sf:plan-approved`
 - ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan; never advances past `sf:plan-review`
 
+**Multi-repo / onboarding**
+- ✅ Skills + scripts are **repo-aware** — no hardcoded repo; `gh` targets the current working directory's repo (override scripts with `SF_REPO`). One user-scope install serves every repo. Verified on `databeacon/localr5` (under `david4aero`).
+- ✅ `sf-init-labels.sh [owner/repo]` — bootstrap the label state machine on any repo (idempotent). Precursor to a future `/sf-install` one-command onboarding.
+- ⚠️ For DataBeacon repos: `gh auth switch --user david4aero` first; restore `kilo9alfa` after.
+
 **State machine**
 - ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` (`sf:*` are additive; classification kept as permanent metadata)
 - **Approval gate:** plan *generation* is autonomous; plan *approval* is human-only — a person adds `sf:plan-approved` (via `sf-approve-plan.sh <N>`) after reading the plan. The dispatcher parks at `sf:plan-review`.

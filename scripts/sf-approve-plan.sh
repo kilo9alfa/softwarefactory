@@ -11,7 +11,7 @@ set -euo pipefail
 #
 # Usage: sf-approve-plan.sh <issue-number>
 
-REPO="${SF_REPO:-kilo9alfa/softwarefactory}"
+REPO="${SF_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo kilo9alfa/softwarefactory)}"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 mkdir -p "$LOG_DIR"
 

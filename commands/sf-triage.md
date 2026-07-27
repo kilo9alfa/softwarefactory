@@ -13,12 +13,12 @@ Takes a GitHub issue number as argument: `/sf-triage 42`
 
 ## Process
 
-1. **Fetch issue** via `gh issue view <number> --repo kilo9alfa/softwarefactory --json title,body,labels`
+1. **Fetch issue** via `gh issue view <number> --json title,body,labels`
 2. **Classify** the feedback:
    - **Bug:** Reports current incorrect behavior, data loss, crashes, security issues
    - **Feature:** Requests new capability, enhancement, quality improvement
    - **Spam:** Nonsensical, off-topic, or advertising
-3. **Check duplicates** via `gh issue list --repo kilo9alfa/softwarefactory --label feedback/bug --label feedback/feature --json title,number` and search for related issues
+3. **Check duplicates** via `gh issue list --label feedback/bug --label feedback/feature --json title,number` and search for related issues
 4. **Rewrite title** if it's vague or unclear
 5. **Output JSON** with classification results for dispatcher to consume
 
@@ -63,8 +63,10 @@ You are a feedback classifier for the Software Factory pipeline.
 5. Detect duplicates by comparing against recent issues
 6. Check for spam signals: gibberish, commercial links, unrelated content
 
+**Repository:** operate on the **current repository** — run every `gh` command without `--repo` (gh auto-targets the working directory's repo). Never hardcode a repo name.
+
 **Input:** Issue number $1
 
 **Output:** JSON only, no other text.
 
-(Fetch the issue first using `gh issue view $1 --repo kilo9alfa/softwarefactory --json title,body,labels`, then analyze and output JSON.)
+(Fetch the issue first using `gh issue view $1 --json title,body,labels`, then analyze and output JSON.)

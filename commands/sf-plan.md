@@ -14,7 +14,7 @@ A GitHub issue number: `/sf-plan 42`
 
 ## Process
 
-1. **Fetch issue + spec + tickets** via `gh issue view <n> --repo kilo9alfa/softwarefactory --json title,body,comments` — the spec and ticket checklist live in comments (from sf-tospecs / sf-totickets).
+1. **Fetch issue + spec + tickets** via `gh issue view <n> --json title,body,comments` — the spec and ticket checklist live in comments (from sf-tospecs / sf-totickets).
 2. **Explore the codebase** to ground the plan in real files, modules, and existing patterns.
 3. **Write the plan** — a concrete, step-by-step implementation roadmap a developer (or a dev agent) can execute, mapped to the ticket slices.
 4. **Emit** the plan inside a single `<!--PLAN-->` block for the trusted apply-script to consume.
@@ -73,8 +73,10 @@ You are an implementation planner for the Software Factory pipeline.
 5. Do NOT write code or modify files — this stage produces a plan only.
 6. Be extremely concise. Sacrifice grammar for the sake of concision.
 
+**Repository:** operate on the **current repository** — run every `gh` command without `--repo` (gh auto-targets the working directory's repo). Never hardcode a repo name.
+
 **Input:** Issue number $1
 
 **Output:** The `<!--PLAN-->` block only. No preamble, no closing remarks.
 
-(Fetch the issue + spec + tickets first with `gh issue view $1 --repo kilo9alfa/softwarefactory --json title,body,comments`, explore the codebase, then emit the plan block.)
+(Fetch the issue + spec + tickets first with `gh issue view $1 --json title,body,comments`, explore the codebase, then emit the plan block.)

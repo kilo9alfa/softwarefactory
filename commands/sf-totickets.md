@@ -14,7 +14,7 @@ A GitHub issue number: `/sf-totickets 42`
 
 ## Process
 
-1. **Fetch issue + spec** via `gh issue view <n> --repo kilo9alfa/softwarefactory --json title,body,comments` — the spec lives in a comment (posted by sf-tospecs).
+1. **Fetch issue + spec** via `gh issue view <n> --json title,body,comments` — the spec lives in a comment (posted by sf-tospecs).
 2. **Explore the codebase** for domain vocabulary and module boundaries.
 3. **Draft vertical slices** — each ticket is a narrow but *complete* path through all layers (schema → API → UI → tests), independently demoable/verifiable, sized for a single agent context window. NOT horizontal layers.
 4. **Set blocking edges** that reflect genuine dependencies only.
@@ -73,8 +73,10 @@ You are a ticket decomposer for the Software Factory pipeline.
 5. Prefer user-facing behavior over implementation detail in titles/bodies.
 6. Be extremely concise. Sacrifice grammar for the sake of concision.
 
+**Repository:** operate on the **current repository** — run every `gh` command without `--repo` (gh auto-targets the working directory's repo). Never hardcode a repo name.
+
 **Input:** Issue number $1
 
 **Output:** JSON only, no other text.
 
-(Fetch the issue + spec first with `gh issue view $1 --repo kilo9alfa/softwarefactory --json title,body,comments`, explore the codebase, then emit the JSON.)
+(Fetch the issue + spec first with `gh issue view $1 --json title,body,comments`, explore the codebase, then emit the JSON.)

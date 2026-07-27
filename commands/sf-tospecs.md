@@ -14,7 +14,7 @@ A GitHub issue number: `/sf-tospecs 42`
 
 ## Process
 
-1. **Fetch issue** via `gh issue view <n> --repo kilo9alfa/softwarefactory --json title,body,labels,comments`
+1. **Fetch issue** via `gh issue view <n> --json title,body,labels,comments`
 2. **Explore the codebase** to adopt its domain vocabulary and respect existing architecture (ADRs). Read README, relevant docs, and the modules the feature touches.
 3. **Map testing seams** — identify where this feature would be validated. Prefer the *highest existing* integration seam; minimize new seams.
 4. **Synthesize** the spec from what is already known. Do NOT interview a user — there is no human in this loop.
@@ -80,8 +80,10 @@ You are a specification writer for the Software Factory pipeline.
 5. Implementation decisions describe modules/interfaces/contracts — NOT file paths (they go stale).
 6. Be extremely concise. Sacrifice grammar for the sake of concision.
 
+**Repository:** operate on the **current repository** — run every `gh` command without `--repo` (gh auto-targets the working directory's repo). Never hardcode a repo name.
+
 **Input:** Issue number $1
 
 **Output:** The `<!--SPEC-->` block only. No preamble, no closing remarks.
 
-(Fetch the issue first with `gh issue view $1 --repo kilo9alfa/softwarefactory --json title,body,labels,comments`, explore the codebase, then emit the spec block.)
+(Fetch the issue first with `gh issue view $1 --json title,body,labels,comments`, explore the codebase, then emit the spec block.)

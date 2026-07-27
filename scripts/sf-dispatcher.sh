@@ -18,8 +18,10 @@ set -euo pipefail
 # Plan GENERATION is autonomous; plan APPROVAL is human-only (sf-approve-plan.sh
 # adds sf:plan-approved). The dispatcher never advances past sf:plan-review.
 
-REPO="${SF_REPO:-kilo9alfa/softwarefactory}"
+# REPO_DIR is the working tree the agents run in; REPO defaults to that dir's
+# GitHub repo (so `SF_REPO_DIR=~/code/localr5` alone targets databeacon/localr5).
 REPO_DIR="${SF_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+REPO="${SF_REPO:-$(cd "$REPO_DIR" && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo kilo9alfa/softwarefactory)}"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 RETRY_MAX=3
 SESSION_TIMEOUT=900  # 15 minutes — spec/tickets explore the codebase
