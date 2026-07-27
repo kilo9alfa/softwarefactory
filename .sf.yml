@@ -1,0 +1,11 @@
+# Software Factory per-project config. The factory reads this from the repo root.
+# Only `test:` is consumed today (stage 4); the rest are placeholders for stages
+# 4–5 and will be wired as those stages land.
+
+# Stage 4 (/sf-test): shell command run in the issue's worktree. Exit 0 = pass
+# (→ sf:ready-for-prod), non-zero = fail (→ sf:needs-debug). For a monorepo,
+# cd into the subproject: e.g. `cd enroute-kpis-local && python -m pytest -q`.
+test: bash tests/smoke.sh
+
+# staging_url:            # (later) smoke-tested after a staging deploy
+# deploy:                 # (later, stage 5) production deploy command
