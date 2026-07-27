@@ -10,11 +10,37 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 ### What's Built
 
-- ✅ Plugin scaffold (`.claude-plugin/plugin.json`)
-- ✅ `/sf-triage` skill (classify feedback: bug vs feature vs spam)
-- ✅ `sf-dispatcher.sh` (poll for feedback/triage, spawn tmux agents)
+- ✅ Installable plugin (`.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` — repo is its own marketplace)
+- ✅ `sf-triage` skill (classify feedback: bug vs feature vs spam) — invoked as `/softwarefactory:sf-triage <n>`
+- ✅ `sf-apply-label.sh` (trusted state-transition step: validates classification, swaps label, rewrites title, closes spam)
+- ✅ `sf-dispatcher.sh` (poll for feedback/triage, spawn tmux agents, apply label after triage)
+- ✅ `sf-dev-sync.sh` (refresh installed plugin from working tree during development)
 - ✅ Systemd service + timer (run dispatcher every 5 min on Nuclaw)
 - ✅ GitHub labels (feedback/triage → feedback/bug|feature|sf:spam)
+
+## Installation (plugin)
+
+The repo is its own single-plugin marketplace. Install from a local checkout (best
+for development — testable without pushing) or straight from GitHub (Nuclaw / prod):
+
+```bash
+# Local checkout (dev):
+claude plugin marketplace add ~/code/softwarefactory
+claude plugin install softwarefactory@softwarefactory
+
+# From GitHub (Nuclaw / prod, after pushing):
+claude plugin marketplace add kilo9alfa/softwarefactory
+claude plugin install softwarefactory@softwarefactory
+```
+
+Commands are namespaced by plugin. Invoke the skill as **`/softwarefactory:sf-triage <issue-number>`**.
+
+### Development loop — testing changes as you build
+
+| You edited... | To test the change |
+|---|---|
+| `scripts/*.sh` (dispatcher, apply-label, dev-sync) | Run directly — they execute live from the repo, no refresh needed |
+| `commands/*.md` (the skills) | Run `bash scripts/sf-dev-sync.sh` first — `install` caches a version-pinned **copy**, so command edits need a reinstall to propagate. `plugin update` / `marketplace update` are no-ops at the same version |
 
 ### Next Steps
 

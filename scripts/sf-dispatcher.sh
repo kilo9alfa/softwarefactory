@@ -75,7 +75,8 @@ spawn_agent() {
 
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
         "cd ${HOME}/code/softwarefactory && \
-         claude --dangerously-skip-permissions -p /sf-triage $issue_num 2>&1 | tee $log_file; \
+         claude --dangerously-skip-permissions -p '/softwarefactory:sf-triage $issue_num' 2>&1 | tee $log_file; \
+         bash ${HOME}/code/softwarefactory/scripts/sf-apply-label.sh $issue_num $log_file; \
          tmux kill-session -t $session_name"
 
     # Set session timeout (kill after N seconds if still running)

@@ -1,3 +1,8 @@
+---
+description: Classify a feedback issue (bug/feature/spam), check duplicates, rewrite title; emit JSON
+argument-hint: <issue-number>
+---
+
 # sf-triage
 
 Classify feedback issue (bug vs feature), check for duplicates, discard spam, rewrite title.
@@ -58,8 +63,8 @@ You are a feedback classifier for the Software Factory pipeline.
 5. Detect duplicates by comparing against recent issues
 6. Check for spam signals: gibberish, commercial links, unrelated content
 
-**Input:** Issue number {{{issue_number}}}
+**Input:** Issue number $1
 
 **Output:** JSON only, no other text.
 
-(Fetch the issue first using `gh issue view {{{issue_number}}} --repo kilo9alfa/softwarefactory --json title,body,labels`, then analyze and output JSON.)
+(Fetch the issue first using `gh issue view $1 --repo kilo9alfa/softwarefactory --json title,body,labels`, then analyze and output JSON.)

@@ -1,22 +1,10 @@
 {
   "name": "softwarefactory",
   "version": "0.1.0",
-  "description": "Autonomous feedback-to-production pipeline for Claude Code",
-  "author": "David (kilo9alfa)",
-  "commands": [
-    {
-      "name": "sf-triage",
-      "description": "Classify feedback issue (bug vs feature), check duplicates, swap label",
-      "path": "commands/sf-triage.md"
-    }
-  ],
-  "scripts": {
-    "dispatcher": "scripts/sf-dispatcher.sh"
+  "description": "Autonomous feedback-to-production pipeline for Claude Code. Commands classify GitHub feedback issues and advance them through a label-based state machine.",
+  "author": {
+    "name": "David",
+    "email": "david@kilo9alfa.com"
   },
-  "config": {
-    "githubRepo": "kilo9alfa/softwarefactory",
-    "slackChannel": "#software-factory",
-    "tmuxPrefix": "sf-",
-    "worktreeRoot": "~/wt"
-  }
+  "homepage": "https://github.com/kilo9alfa/softwarefactory"
 }
