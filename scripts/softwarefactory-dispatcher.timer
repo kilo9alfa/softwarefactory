@@ -1,0 +1,15 @@
+[Unit]
+Description=Software Factory Feedback Dispatcher Timer
+Documentation=https://github.com/kilo9alfa/softwarefactory
+Requires=softwarefactory-dispatcher.service
+
+[Timer]
+# Run every 5 minutes
+OnBootSec=30s
+OnUnitActiveSec=5min
+
+# Run immediately on system startup + 30s delay
+Persistent=true
+
+[Install]
+WantedBy=timers.target

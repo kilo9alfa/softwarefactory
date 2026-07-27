@@ -1,0 +1,19 @@
+[Unit]
+Description=Software Factory Feedback Dispatcher
+Documentation=https://github.com/kilo9alfa/softwarefactory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/code/softwarefactory/scripts/sf-dispatcher.sh
+StandardOutput=journal
+StandardError=journal
+WorkingDirectory=%h/code/softwarefactory
+
+# Environment
+Environment="PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="HOME=%h"
+
+[Install]
+WantedBy=default.target
