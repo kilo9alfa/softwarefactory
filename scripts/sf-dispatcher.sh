@@ -14,9 +14,12 @@ set -euo pipefail
 #   spec   : feedback/bug | feedback/feature -> sf-tospecs   -> sf-apply-spec.sh    (done: sf:spec)
 #   tickets: sf:spec                         -> sf-totickets -> sf-apply-tickets.sh (done: sf:tickets)
 #   plan   : sf:tickets                      -> sf-plan      -> sf-apply-plan.sh    (done: sf:plan-review|sf:plan-approved)
+#   dev    : sf:plan-approved                -> sf-dev       -> sf-apply-dev.sh     (done: sf:implemented) [writes: worktree + draft PR]
 #
 # Plan GENERATION is autonomous; plan APPROVAL is human-only (sf-approve-plan.sh
 # adds sf:plan-approved). The dispatcher never advances past sf:plan-review.
+# Dev (3b) runs autonomously in an isolated worktree and opens a DRAFT PR — the
+# PR is the human code-review gate before merge.
 
 # REPO_DIR is the working tree the agents run in; REPO defaults to that dir's
 # GitHub repo (so `SF_REPO_DIR=~/code/localr5` alone targets databeacon/localr5).
@@ -91,6 +94,52 @@ spawn() {
     ) &
 }
 
+# Spawn the WRITING stage (3b dev): prep an isolated worktree, run the dev skill
+# with cwd = that worktree, then push + draft-PR + label via sf-apply-dev.sh.
+spawn_dev() {
+    local issue_num="$1"
+    local session_name="sf-dev-${issue_num}"
+    local log_file="$LOG_DIR/dev-${issue_num}.log"
+
+    if session_exists "$session_name"; then
+        log "[dev] session $session_name already running, skipping #$issue_num"; return 0
+    fi
+    if ! attempts_ok "dev-${issue_num}"; then
+        log "[dev] #$issue_num exceeded retry limit ($RETRY_MAX), skipping"; return 1
+    fi
+
+    log "[dev] spawning agent for #$issue_num in $session_name"
+    tmux new-session -d -s "$session_name" -x 200 -y 50 \
+        "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; \
+         wt=\$(bash '${REPO_DIR}/scripts/sf-prep-worktree.sh' ${issue_num}) && cd \"\$wt\" && \
+         claude --dangerously-skip-permissions -p '/softwarefactory:sf-dev ${issue_num}' 2>&1 | tee '${log_file}'; \
+         bash '${REPO_DIR}/scripts/sf-apply-dev.sh' ${issue_num} \"\$wt\" '${log_file}'; \
+         tmux kill-session -t ${session_name}"
+
+    ( sleep "$SESSION_TIMEOUT"
+      if session_exists "$session_name"; then
+          log "[dev] session $session_name timeout (${SESSION_TIMEOUT}s), killing"
+          tmux kill-session -t "$session_name" 2>/dev/null || true
+      fi ) &
+}
+
+# Process the dev stage: trigger sf:plan-approved, done sf:implemented.
+process_dev() {
+    local issues issue_num labels
+    issues=$(gh issue list --repo "$REPO" --state open --label "sf:plan-approved" --json number --jq '.[].number' 2>/dev/null || echo "")
+    issues=$(echo "$issues" | grep -E '^[0-9]+$' | sort -u || echo "")
+    [ -z "$issues" ] && return 0
+    log "[dev] candidates: $(echo "$issues" | tr '\n' ' ')"
+    while IFS= read -r issue_num; do
+        [ -z "$issue_num" ] && continue
+        labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+        if echo "$labels" | grep -qx "sf:implemented"; then
+            log "[dev] #$issue_num already implemented, skipping"; continue
+        fi
+        spawn_dev "$issue_num" || log "[dev] failed to spawn for #$issue_num"
+    done <<< "$issues"
+}
+
 # Process one stage across all matching open issues.
 #   $1 stage  $2 skill  $3 apply_script  $4 "trigger labels (space-sep, OR)"  $5 "done labels (space-sep, any=skip)"
 process_stage() {
@@ -129,6 +178,7 @@ main() {
     process_stage "spec"    "sf-tospecs"   "sf-apply-spec.sh"    "feedback/bug feedback/feature"   "sf:spec"
     process_stage "tickets" "sf-totickets" "sf-apply-tickets.sh" "sf:spec"                         "sf:tickets"
     process_stage "plan"    "sf-plan"      "sf-apply-plan.sh"    "sf:tickets"                      "sf:plan-review sf:plan-approved"
+    process_dev   # 3b: sf:plan-approved -> worktree -> /sf-dev -> draft PR -> sf:implemented
 
     log "Dispatcher cycle complete"
 }

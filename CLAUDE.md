@@ -6,7 +6,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Design Document:** [docs/2026.07.26.Software_Factory_Design.md](docs/2026.07.26.Software_Factory_Design.md)
 
-## Current Phase: 3a (Autonomous Planning + Approval Gate)
+## Current Phase: 3b (Autonomous Development → draft PR)
 
 ### What's Built
 
@@ -20,6 +20,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-tospecs` (Sonnet) — classified issue → structured spec (emits `<!--SPEC-->` block)
 - ✅ `sf-totickets` (Opus) — spec → vertical-slice tickets (emits format-agnostic JSON)
 - ✅ `sf-plan` (Fable 5) — spec + tickets → implementation plan (emits `<!--PLAN-->` block)
+- ✅ `sf-dev` (Opus) — implement approved plan in an isolated worktree; commits **locally only** (emits `<!--DEV-->` block)
 
 **Trusted scripts (do every label transition; validate the skill's advisory output)**
 - ✅ `sf-apply-label.sh` — triage → `feedback/bug`\|`feature`\|`sf:spam` (rewrites title, closes spam)
@@ -27,7 +28,9 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-apply-tickets.sh` — parses JSON, renders dependency-ordered checklist, **+**`sf:tickets`
 - ✅ `sf-apply-plan.sh` — extracts plan, posts comment, **+**`sf:plan-review` (parks at approval gate)
 - ✅ `sf-approve-plan.sh` — **human approval action**: `sf:plan-review` → **+**`sf:plan-approved`
-- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan; never advances past `sf:plan-review`
+- ✅ `sf-prep-worktree.sh` — isolated `wt-impl-N` (branch `sf/impl-N`), namespaced per repo under `~/sf-worktrees/`
+- ✅ `sf-apply-dev.sh` — push branch, open **draft PR**, **+**`sf:implemented`
+- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev; never advances past `sf:plan-review`
 
 **Multi-repo / onboarding**
 - ✅ Skills + scripts are **repo-aware** — no hardcoded repo; `gh` targets the current working directory's repo (override scripts with `SF_REPO`). One user-scope install serves every repo. Verified on `databeacon/localr5` (under `david4aero`).
@@ -35,8 +38,8 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ⚠️ For DataBeacon repos: `gh auth switch --user david4aero` first; restore `kilo9alfa` after.
 
 **State machine**
-- ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` (`sf:*` are additive; classification kept as permanent metadata)
-- **Approval gate:** plan *generation* is autonomous; plan *approval* is human-only — a person adds `sf:plan-approved` (via `sf-approve-plan.sh <N>`) after reading the plan. The dispatcher parks at `sf:plan-review`.
+- ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` → **+**`sf:implemented` (`sf:*` are additive; classification kept as permanent metadata)
+- **Two gates:** (1) plan *approval* — human adds `sf:plan-approved` after reading the plan (dispatcher parks at `sf:plan-review`); (2) code review — dev is autonomous but opens a **draft PR**, and a human reviews the PR before merge.
 
 > Full stage-by-stage build map: see the **Implementation Manifest** table in the design doc.
 
@@ -95,6 +98,7 @@ Commands are namespaced by plugin. Invoke the skill as **`/softwarefactory:sf-tr
 | `sf:tickets` | Yellow | Tickets broken down | `/sf-totickets` → `sf-apply-tickets.sh` |
 | `sf:plan-review` | Purple | Plan generated, **awaiting human approval** | `/sf-plan` → `sf-apply-plan.sh` |
 | `sf:plan-approved` | Green | Human approved the plan; ready for dev | **Human** → `sf-approve-plan.sh` |
+| `sf:implemented` | Violet | Code implemented; **draft PR open** for review | `/sf-dev` → `sf-apply-dev.sh` |
 
 ## Git Identity
 
