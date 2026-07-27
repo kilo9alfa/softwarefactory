@@ -6,7 +6,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Design Document:** [docs/2026.07.26.Software_Factory_Design.md](docs/2026.07.26.Software_Factory_Design.md)
 
-## Current Phase: 3b (Autonomous Development → draft PR)
+## Current Phase: 4 (Autonomous Testing — deterministic gate)
 
 ### What's Built
 
@@ -30,7 +30,12 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-approve-plan.sh` — **human approval action**: `sf:plan-review` → **+**`sf:plan-approved`
 - ✅ `sf-prep-worktree.sh` — isolated `wt-impl-N` (branch `sf/impl-N`), namespaced per repo under `~/sf-worktrees/`
 - ✅ `sf-apply-dev.sh` — push branch, open **draft PR**, **+**`sf:implemented`
-- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev; never advances past `sf:plan-review`
+- ✅ `sf-test.sh` — **stage 4 (script-only, no LLM):** checks out `sf/impl-N`, runs `.sf.yml` `test:`, gates on **exit code** → **+**`sf:ready-for-prod` (0) \| **+**`sf:needs-debug` (≠0)
+- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev / test; parks at `sf:plan-review`
+
+**Per-project config & self-test**
+- ✅ `.sf.yml` (repo root) — `test:` command consumed by stage 4; `deploy`/`staging_url` reserved for stage 5
+- ✅ `tests/smoke.sh` — this repo's own test (syntax-checks scripts, validates skill frontmatter + JSON manifests); wired as `.sf.yml` `test:`
 
 **Multi-repo / onboarding**
 - ✅ Skills + scripts are **repo-aware** — no hardcoded repo; `gh` targets the current working directory's repo (override scripts with `SF_REPO`). One user-scope install serves every repo. Verified on `databeacon/localr5` (under `david4aero`).
@@ -38,7 +43,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ⚠️ For DataBeacon repos: `gh auth switch --user david4aero` first; restore `kilo9alfa` after.
 
 **State machine**
-- ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` → **+**`sf:implemented` (`sf:*` are additive; classification kept as permanent metadata)
+- ✅ GitHub labels: `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` → **+**`sf:implemented` → **+**`sf:ready-for-prod` \| `sf:needs-debug` (`sf:*` are additive; classification kept as permanent metadata)
 - **Two gates:** (1) plan *approval* — human adds `sf:plan-approved` after reading the plan (dispatcher parks at `sf:plan-review`); (2) code review — dev is autonomous but opens a **draft PR**, and a human reviews the PR before merge.
 
 > Full stage-by-stage build map: see the **Implementation Manifest** table in the design doc.
@@ -99,6 +104,8 @@ Commands are namespaced by plugin. Invoke the skill as **`/softwarefactory:sf-tr
 | `sf:plan-review` | Purple | Plan generated, **awaiting human approval** | `/sf-plan` → `sf-apply-plan.sh` |
 | `sf:plan-approved` | Green | Human approved the plan; ready for dev | **Human** → `sf-approve-plan.sh` |
 | `sf:implemented` | Violet | Code implemented; **draft PR open** for review | `/sf-dev` → `sf-apply-dev.sh` |
+| `sf:ready-for-prod` | Green | Tests pass; awaiting human stage-5 trigger | `sf-test.sh` (exit 0) |
+| `sf:needs-debug` | Red | Tests failed; needs debugging | `sf-test.sh` (exit ≠0) |
 
 ## Git Identity
 

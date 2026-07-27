@@ -15,6 +15,7 @@ set -euo pipefail
 #   tickets: sf:spec                         -> sf-totickets -> sf-apply-tickets.sh (done: sf:tickets)
 #   plan   : sf:tickets                      -> sf-plan      -> sf-apply-plan.sh    (done: sf:plan-review|sf:plan-approved)
 #   dev    : sf:plan-approved                -> sf-dev       -> sf-apply-dev.sh     (done: sf:implemented) [writes: worktree + draft PR]
+#   test   : sf:implemented                  -> (script-only) sf-test.sh           (done: sf:ready-for-prod|sf:needs-debug) [runs .sf.yml test:]
 #
 # Plan GENERATION is autonomous; plan APPROVAL is human-only (sf-approve-plan.sh
 # adds sf:plan-approved). The dispatcher never advances past sf:plan-review.
@@ -140,6 +141,46 @@ process_dev() {
     done <<< "$issues"
 }
 
+# Spawn the TEST stage (4): script-only (no LLM) — runs the repo's test command
+# and gates on its exit code via sf-test.sh.
+spawn_test() {
+    local issue_num="$1"
+    local session_name="sf-test-${issue_num}"
+    if session_exists "$session_name"; then
+        log "[test] session $session_name already running, skipping #$issue_num"; return 0
+    fi
+    if ! attempts_ok "test-${issue_num}"; then
+        log "[test] #$issue_num exceeded retry limit ($RETRY_MAX), skipping"; return 1
+    fi
+    log "[test] spawning tester for #$issue_num in $session_name"
+    tmux new-session -d -s "$session_name" -x 200 -y 50 \
+        "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; \
+         bash '${REPO_DIR}/scripts/sf-test.sh' ${issue_num}; \
+         tmux kill-session -t ${session_name}"
+    ( sleep "$SESSION_TIMEOUT"
+      if session_exists "$session_name"; then
+          log "[test] session $session_name timeout (${SESSION_TIMEOUT}s), killing"
+          tmux kill-session -t "$session_name" 2>/dev/null || true
+      fi ) &
+}
+
+# Process the test stage: trigger sf:implemented, done sf:ready-for-prod|needs-debug.
+process_test() {
+    local issues issue_num labels
+    issues=$(gh issue list --repo "$REPO" --state open --label "sf:implemented" --json number --jq '.[].number' 2>/dev/null || echo "")
+    issues=$(echo "$issues" | grep -E '^[0-9]+$' | sort -u || echo "")
+    [ -z "$issues" ] && return 0
+    log "[test] candidates: $(echo "$issues" | tr '\n' ' ')"
+    while IFS= read -r issue_num; do
+        [ -z "$issue_num" ] && continue
+        labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+        if echo "$labels" | grep -qE "^sf:ready-for-prod$|^sf:needs-debug$"; then
+            log "[test] #$issue_num already tested, skipping"; continue
+        fi
+        spawn_test "$issue_num" || log "[test] failed to spawn for #$issue_num"
+    done <<< "$issues"
+}
+
 # Process one stage across all matching open issues.
 #   $1 stage  $2 skill  $3 apply_script  $4 "trigger labels (space-sep, OR)"  $5 "done labels (space-sep, any=skip)"
 process_stage() {
@@ -178,7 +219,8 @@ main() {
     process_stage "spec"    "sf-tospecs"   "sf-apply-spec.sh"    "feedback/bug feedback/feature"   "sf:spec"
     process_stage "tickets" "sf-totickets" "sf-apply-tickets.sh" "sf:spec"                         "sf:tickets"
     process_stage "plan"    "sf-plan"      "sf-apply-plan.sh"    "sf:tickets"                      "sf:plan-review sf:plan-approved"
-    process_dev   # 3b: sf:plan-approved -> worktree -> /sf-dev -> draft PR -> sf:implemented
+    process_dev    # 3b: sf:plan-approved -> worktree -> /sf-dev -> draft PR -> sf:implemented
+    process_test   # 4:  sf:implemented -> run .sf.yml test cmd -> sf:ready-for-prod | sf:needs-debug
 
     log "Dispatcher cycle complete"
 }
