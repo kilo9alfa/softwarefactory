@@ -27,6 +27,11 @@ set -euo pipefail
 REPO_DIR="${SF_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 REPO="${SF_REPO:-$(cd "$REPO_DIR" && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)}"
 : "${REPO:?SF_REPO unset and gh cannot resolve the repo -- run inside the repo, set SF_REPO, or export GH_TOKEN}"
+
+# FACTORY_DIR is the Software Factory checkout itself (this script's repo). The
+# trusted apply/prep/test scripts live HERE, not in the target repo — so they must
+# be invoked from FACTORY_DIR, never REPO_DIR (which is the repo being processed).
+FACTORY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 RETRY_MAX=3
 SESSION_TIMEOUT=900  # 15 minutes — spec/tickets explore the codebase
@@ -83,7 +88,7 @@ spawn() {
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
         "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; cd ${REPO_DIR} && \
          claude --dangerously-skip-permissions -p '/softwarefactory:${skill} ${issue_num}' 2>&1 | tee ${log_file}; \
-         bash ${REPO_DIR}/scripts/${apply_script} ${issue_num} ${log_file}; \
+         bash ${FACTORY_DIR}/scripts/${apply_script} ${issue_num} ${log_file}; \
          tmux kill-session -t ${session_name}"
 
     # Watchdog: kill a hung session after the timeout.
@@ -113,9 +118,9 @@ spawn_dev() {
     log "[dev] spawning agent for #$issue_num in $session_name"
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
         "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; \
-         wt=\$(bash '${REPO_DIR}/scripts/sf-prep-worktree.sh' ${issue_num}) && cd \"\$wt\" && \
+         wt=\$(bash '${FACTORY_DIR}/scripts/sf-prep-worktree.sh' ${issue_num}) && cd \"\$wt\" && \
          claude --dangerously-skip-permissions -p '/softwarefactory:sf-dev ${issue_num}' 2>&1 | tee '${log_file}'; \
-         bash '${REPO_DIR}/scripts/sf-apply-dev.sh' ${issue_num} \"\$wt\" '${log_file}'; \
+         bash '${FACTORY_DIR}/scripts/sf-apply-dev.sh' ${issue_num} \"\$wt\" '${log_file}'; \
          tmux kill-session -t ${session_name}"
 
     ( sleep "$SESSION_TIMEOUT"
@@ -156,7 +161,7 @@ spawn_test() {
     log "[test] spawning tester for #$issue_num in $session_name"
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
         "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; \
-         bash '${REPO_DIR}/scripts/sf-test.sh' ${issue_num}; \
+         bash '${FACTORY_DIR}/scripts/sf-test.sh' ${issue_num}; \
          tmux kill-session -t ${session_name}"
     ( sleep "$SESSION_TIMEOUT"
       if session_exists "$session_name"; then
