@@ -19,3 +19,5 @@ test: bash tests/smoke.sh
 # failed (→ sf:deploy-failed). softwarefactory has no real prod target, so this
 # is a safe placeholder that reports the plugin version.
 deploy: bash tests/smoke.sh && echo "🚀 placeholder deploy OK — softwarefactory has no real production target"
+
+slack_channel: "C0BLCQB6NBB"

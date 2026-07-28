@@ -18,9 +18,14 @@ set -uo pipefail
 # Vaultwarden session (Nuclaw auto-loads it; systemd env may not have it).
 export BW_SESSION="${BW_SESSION:-$(cat "$HOME/.config/bw-session" 2>/dev/null || echo "")}"
 
-# Pin this repo's gh identity via a token fetched from Vaultwarden.
+# Pin this repo's gh identity via a token fetched from Vaultwarden. Prefer the item's password
+# field; fall back to its Notes field so a secure-note item holding just the PAT works too.
 if [ -n "${SF_GH_TOKEN_ITEM:-}" ] && command -v bw >/dev/null 2>&1; then
     tok=$(bw --nointeraction get password "$SF_GH_TOKEN_ITEM" </dev/null 2>/dev/null || echo "")
+    if [ -z "$tok" ]; then
+        tok=$(bw --nointeraction get notes "$SF_GH_TOKEN_ITEM" </dev/null 2>/dev/null \
+              | grep -oE 'github_pat_[A-Za-z0-9_]+|ghp_[A-Za-z0-9]+' | head -1 || echo "")
+    fi
     [ -n "$tok" ] && export GH_TOKEN="$tok"
 fi
 
