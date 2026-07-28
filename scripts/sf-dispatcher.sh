@@ -232,6 +232,10 @@ main() {
     process_dev    # 3b: sf:plan-approved -> worktree -> /sf-dev -> draft PR -> sf:implemented
     process_test   # 4:  sf:implemented -> run .sf.yml test cmd -> sf:ready-for-prod | sf:needs-debug
 
+    # Human-in-the-loop: act on Slack thread replies (merge/deploy/approve/close).
+    # Best-effort; gated on SF_SLACK_ADMIN_USER inside the script (no-op if unset).
+    SF_REPO="$REPO" bash "$FACTORY_DIR/scripts/sf-slack-commands.sh" "$REPO_DIR" >/dev/null 2>&1 || true
+
     log "Dispatcher cycle complete"
 }
 
