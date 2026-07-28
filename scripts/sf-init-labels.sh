@@ -7,20 +7,28 @@ set -euo pipefail
 # the label already exists). Run once per repo to make it factory-compliant.
 # This is the label half of the future `/sf-install` onboarding command.
 #
+# Every description is prefixed with the label's pipeline stage number (from the
+# shared map in sf-stages.sh), so the stage position is visible in the GitHub
+# labels UI. `--force` means existing repos pick the new text up on a re-run.
+# Label NAMES are untouched — they are the state machine's exact-match keys.
+#
 # Usage:
 #   sf-init-labels.sh                 # target the current directory's repo
 #   sf-init-labels.sh owner/repo      # target an explicit repo
+#   sf-init-labels.sh --list          # print name|color|description, touch nothing
 #
 # Auth: gh must be authenticated on the account that owns the repo
 # (e.g. `gh auth switch --user david4aero` for databeacon/* repos).
 
-REPO="${1:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)}"
-if [ -z "$REPO" ]; then
-    echo "error: no repo — run inside a git repo or pass owner/repo" >&2
-    exit 1
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=sf-stages.sh
+. "$SCRIPT_DIR/sf-stages.sh"
 
-# name|color(hex, no #)|description  — the full pipeline state machine.
+LIST_ONLY=0
+if [ "${1:-}" = "--list" ]; then LIST_ONLY=1; shift; fi
+
+# name|color(hex, no #)|description  — the full pipeline state machine. The
+# stage prefix is added below from the shared map, never written by hand.
 LABELS=(
     "feedback/triage|FEF2C0|Raw feedback, awaiting triage"
     "feedback/bug|D73A49|Classified as bug report"
@@ -37,9 +45,25 @@ LABELS=(
     "sf:deploy-failed|E11D21|Production deploy failed"
 )
 
+# --list is repo-independent (it only renders the table) — resolve the repo after.
+if [ "$LIST_ONLY" -eq 1 ]; then
+    for entry in "${LABELS[@]}"; do
+        IFS='|' read -r name color desc <<< "$entry"
+        printf '%s|%s|%s\n' "$name" "$color" "$(sf_label_desc "$name" "$desc")" || exit 1
+    done
+    exit 0
+fi
+
+REPO="${1:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)}"
+if [ -z "$REPO" ]; then
+    echo "error: no repo — run inside a git repo or pass owner/repo" >&2
+    exit 1
+fi
+
 echo "Bootstrapping ${#LABELS[@]} Software Factory labels on $REPO ..."
 for entry in "${LABELS[@]}"; do
     IFS='|' read -r name color desc <<< "$entry"
+    desc="$(sf_label_desc "$name" "$desc")"
     if gh label create "$name" --repo "$REPO" --color "$color" --description "$desc" --force >/dev/null 2>&1; then
         echo "  ✓ $name"
     else
