@@ -20,7 +20,7 @@ export BW_SESSION="${BW_SESSION:-$(cat "$HOME/.config/bw-session" 2>/dev/null ||
 
 # Pin this repo's gh identity via a token fetched from Vaultwarden.
 if [ -n "${SF_GH_TOKEN_ITEM:-}" ] && command -v bw >/dev/null 2>&1; then
-    tok=$(bw get password "$SF_GH_TOKEN_ITEM" 2>/dev/null || echo "")
+    tok=$(bw --nointeraction get password "$SF_GH_TOKEN_ITEM" </dev/null 2>/dev/null || echo "")
     [ -n "$tok" ] && export GH_TOKEN="$tok"
 fi
 

@@ -108,7 +108,7 @@ spawn() {
         "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; cd ${REPO_DIR} && \
          timeout -k 30s ${SESSION_TIMEOUT}s claude --dangerously-skip-permissions -p '/softwarefactory:${skill} ${issue_num}' 2>&1 | tee ${log_file}; rc=\${PIPESTATUS[0]}; \
          if [ \$rc -eq 124 ]; then bash ${FACTORY_DIR}/scripts/sf-notify.sh \"⏱️ #${issue_num} '${stage}' agent hung >${SESSION_TIMEOUT}s and was killed — will retry until the ${RETRY_MAX}-try cap.\" '${REPO_DIR}' >/dev/null 2>&1; fi; \
-         bash ${FACTORY_DIR}/scripts/${apply_script} ${issue_num} ${log_file}; \
+         timeout -k 10s 180s bash ${FACTORY_DIR}/scripts/${apply_script} ${issue_num} ${log_file}; \
          tmux kill-session -t ${session_name}"
 }
 
@@ -133,7 +133,7 @@ spawn_dev() {
          wt=\$(bash '${FACTORY_DIR}/scripts/sf-prep-worktree.sh' ${issue_num}) && cd \"\$wt\" && \
          timeout -k 30s ${SESSION_TIMEOUT}s claude --dangerously-skip-permissions -p '/softwarefactory:sf-dev ${issue_num}' 2>&1 | tee '${log_file}'; rc=\${PIPESTATUS[0]}; \
          if [ \$rc -eq 124 ]; then bash '${FACTORY_DIR}/scripts/sf-notify.sh' \"⏱️ #${issue_num} 'dev' agent hung >${SESSION_TIMEOUT}s and was killed — will retry until the ${RETRY_MAX}-try cap.\" '${REPO_DIR}' >/dev/null 2>&1; fi; \
-         bash '${FACTORY_DIR}/scripts/sf-apply-dev.sh' ${issue_num} \"\$wt\" '${log_file}'; \
+         timeout -k 10s 180s bash '${FACTORY_DIR}/scripts/sf-apply-dev.sh' ${issue_num} \"\$wt\" '${log_file}'; \
          tmux kill-session -t ${session_name}"
 }
 

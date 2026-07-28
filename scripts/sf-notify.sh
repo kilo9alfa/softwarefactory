@@ -35,7 +35,9 @@ if [ -z "$token" ] && command -v bw >/dev/null 2>&1; then
     # Load the persistent Vaultwarden session (non-interactive shells / standalone
     # calls don't inherit it; the systemd wrapper sets it but direct calls don't).
     export BW_SESSION="${BW_SESSION:-$(cat "$HOME/.config/bw-session" 2>/dev/null || echo "")}"
-    token=$(bw get password "${SF_SLACK_ITEM:-Slack Bot Token — kilo9alfa-nuclaw}" 2>/dev/null || echo "")
+    # --nointeraction + </dev/null: NEVER block on a master-password prompt (a
+    # hung `bw` in a tmux pane stalls the whole stage and wedges the session).
+    token=$(bw --nointeraction get password "${SF_SLACK_ITEM:-Slack Bot Token — kilo9alfa-nuclaw}" </dev/null 2>/dev/null || echo "")
 fi
 if [ -z "$token" ]; then
     echo "[notify] no Slack token (SF_SLACK_TOKEN / Vaultwarden '${SF_SLACK_ITEM:-Slack Bot Token — kilo9alfa-nuclaw}') — skipping" >&2; exit 0
