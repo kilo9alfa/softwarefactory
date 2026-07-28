@@ -44,7 +44,8 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `tests/smoke.sh` — this repo's own test (syntax-checks scripts, validates skill frontmatter + JSON manifests); wired as `.sf.yml` `test:`
 
 **Multi-repo / onboarding**
-- ✅ Skills + scripts are **repo-aware** — no hardcoded repo; `gh` targets the current working directory's repo (override scripts with `SF_REPO`). One user-scope install serves every repo. Verified on `databeacon/localr5` (under `david4aero`).
+- ✅ **gh-agnostic** — no hardcoded repo or account anywhere. Scripts resolve `REPO` from `SF_REPO` → `gh`, and **fail cleanly** if neither resolves (no silent `kilo9alfa/softwarefactory` default). Identity via `GH_TOKEN` (any account) or machine `gh` auth. One user-scope install serves every repo.
+- ✅ **A setup specifies three things:** `/sf-install --repo owner/repo --gh-token-item "<Vaultwarden item>" --slack-channel "#chan" [--enable-timer]` — repo → labels+env; gh account → `SF_GH_TOKEN_ITEM` (→ `GH_TOKEN`); slack channel → `.sf.yml`. Verified on `databeacon/localr5` (david4aero) and kilo9alfa.
 - ✅ **`/sf-install`** (skill → `sf-install.sh`) — one-command onboarding: prereq checks (git, `gh` auth **+ identity-mismatch warning**, `jq`, `tmux`), bootstrap labels, scaffold `.sf.yml` if absent, compliance report. Idempotent; never overwrites existing config.
 - ✅ `sf-init-labels.sh [owner/repo]` — labels-only primitive (called by `sf-install.sh`).
 - ⚠️ For DataBeacon repos: `gh auth switch --user david4aero` first; restore `kilo9alfa` after. (The `gh` active account drifts across sessions — `sf-install` warns on mismatch.)

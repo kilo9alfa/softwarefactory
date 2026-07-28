@@ -25,7 +25,8 @@ set -euo pipefail
 # REPO_DIR is the working tree the agents run in; REPO defaults to that dir's
 # GitHub repo (so `SF_REPO_DIR=~/code/localr5` alone targets databeacon/localr5).
 REPO_DIR="${SF_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-REPO="${SF_REPO:-$(cd "$REPO_DIR" && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo kilo9alfa/softwarefactory)}"
+REPO="${SF_REPO:-$(cd "$REPO_DIR" && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)}"
+: "${REPO:?SF_REPO unset and gh cannot resolve the repo -- run inside the repo, set SF_REPO, or export GH_TOKEN}"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 RETRY_MAX=3
 SESSION_TIMEOUT=900  # 15 minutes — spec/tickets explore the codebase
@@ -80,7 +81,7 @@ spawn() {
 
     log "[$stage] spawning agent for #$issue_num in $session_name"
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
-        "cd ${REPO_DIR} && \
+        "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; cd ${REPO_DIR} && \
          claude --dangerously-skip-permissions -p '/softwarefactory:${skill} ${issue_num}' 2>&1 | tee ${log_file}; \
          bash ${REPO_DIR}/scripts/${apply_script} ${issue_num} ${log_file}; \
          tmux kill-session -t ${session_name}"

@@ -1,23 +1,31 @@
 ---
-description: Onboard the current repo to the Software Factory (labels + .sf.yml + prereq checks)
-argument-hint: (run from inside the target repo)
+description: Onboard a repo to the Software Factory (repo + gh account + slack channel)
+argument-hint: [--repo owner/repo] [--gh-token-item "<item>"] [--slack-channel "#chan"] [--enable-timer]
 ---
 
 # sf-install
 
-Make the **current repository** Software Factory-compliant in one step: bootstrap the label state machine, scaffold `.sf.yml`, verify prerequisites, and report what the human still needs to do.
+Make a repository Software Factory-compliant in one step. **A setup specifies three things** — pass them explicitly:
+
+- `--repo owner/repo` — the GitHub repo (default: current repo)
+- `--gh-token-item "<item>"` — the **gh account**: the Vaultwarden item holding that account's PAT (pins identity per repo)
+- `--slack-channel "#chan"` — per-project notifications channel (written to `.sf.yml`)
+
+plus `--enable-timer` to install the per-project dispatcher timer.
 
 ## Usage
 
-From inside the target repo: `/softwarefactory:sf-install`
+From inside the target repo, e.g.:
+`/softwarefactory:sf-install --repo databeacon/localr5 --gh-token-item "GitHub PAT - databeacon" --slack-channel "#localr5-factory" --enable-timer`
 
-## What it does
+## What it does (idempotent)
 
-Runs the bundled `sf-install.sh`, which is idempotent:
-1. Checks prerequisites (git, `gh` auth + identity, `jq`, `tmux`).
-2. Bootstraps the full label state machine (`sf-init-labels.sh`).
-3. Scaffolds a `.sf.yml` template if absent (never overwrites an existing one).
-4. Prints a compliance report + remaining human steps.
+Runs the bundled `sf-install.sh`:
+1. Prerequisites (git, `gh` auth + identity, `jq`, `tmux`).
+2. Bootstraps the label state machine (`sf-init-labels.sh`).
+3. `.sf.yml` — scaffold if absent; set `slack_channel:` from `--slack-channel`.
+4. Writes `~/.config/softwarefactory/<slug>.env` (repo + gh account) when `--gh-token-item`/`--enable-timer` given.
+5. Optionally enables the per-project timer. Prints a compliance report.
 
 ## Safety
 
@@ -32,9 +40,10 @@ You are the Software Factory onboarding assistant.
 **Task:** Onboard the current repository by running the bundled installer, then report the outcome.
 
 **Steps:**
-1. Run: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/sf-install.sh"` in the current working directory.
-2. Relay its output faithfully — the labels created, the `.sf.yml` status (scaffolded vs already present), any prerequisite warnings (especially a `gh` identity mismatch), and the "Next steps (human)" section.
+1. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/sf-install.sh"` in the current working directory, **forwarding the user's arguments verbatim** (`--repo`, `--gh-token-item`, `--slack-channel`, `--enable-timer`).
+2. Relay its output faithfully — labels created, `.sf.yml` status (incl. slack_channel), the env file written, any prerequisite/identity warnings, and the timer step.
 3. If the script exits non-zero (failed prerequisites), surface exactly what to fix — do not proceed or pretend it succeeded.
+4. If the user didn't specify `--slack-channel` or `--gh-token-item`, remind them a full setup specifies repo + gh account + slack channel.
 
 **Rules:**
 - Do not fabricate results — report only what the script actually prints.
