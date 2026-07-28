@@ -1,27 +1,40 @@
-# Current State — 2026.07.27 10:42
+# Current State — 2026.07.28
 
 ## Status
-Software Factory is a Claude Code plugin implementing an autonomous feedback-to-production pipeline driven by GitHub labels. **Phase 1 (triage) is functionally complete and verified end-to-end.** The repo is now its own installable single-plugin marketplace; the triage → label state machine works via the packaged, namespaced plugin. Not yet deployed to Nuclaw.
+Software Factory is a Claude Code plugin implementing an autonomous feedback-to-production pipeline driven by GitHub labels. **The full pipeline (stages 0–5) is code-complete and verified locally.** Repo is its own installable single-plugin marketplace. **Not yet deployed to Nuclaw; feedback-ingestion endpoint not built** (issues created manually today).
 
-## Pending
-- High: Commit `docs/CurrentState.md` + `docs/2026.07.27.EndOfSessionSummary.md` (untracked — not yet in git)
-- High: Deploy to Nuclaw (runbook Tests 4–6) — install plugin from GitHub, copy scripts, enable systemd timer for the live 5-min dispatcher loop
-- Medium: Phase 2 skills — `/sf-tospecs` (specs from classified feedback) and `/sf-totickets` (break specs into tickets)
-- Low: Close test issues #2 (feature) and #3 (bug) on the repo when done using them as fixtures
+Pipeline: `feedback → triage → spec → tickets → plan → [human approve] → dev → draft PR → test → [human trigger] → deploy → shipped`.
 
-## Quick Start
-1. Verify plugin still installed: `claude plugin list | grep softwarefactory` (should be enabled, v0.1.0)
-2. Full triage flow: `claude -p "/softwarefactory:sf-triage <n>" | tee LOG` then `bash scripts/sf-apply-label.sh <n> LOG`
-3. After editing `commands/*.md`, run `bash scripts/sf-dev-sync.sh` to propagate (install caches a version-pinned copy)
+## Built & verified ✅
+| Stage / piece | How |
+|---|---|
+| 0 triage | `/sf-triage` (Haiku) → `sf-apply-label.sh` |
+| 1 specs | `/sf-tospecs` (Sonnet) → `sf-apply-spec.sh` |
+| 2 tickets | `/sf-totickets` (Opus) → `sf-apply-tickets.sh` |
+| 3a plan | `/sf-plan` (Fable 5) → `sf-apply-plan.sh` → **human** `sf-approve-plan.sh` |
+| 3b dev | `sf-prep-worktree.sh` → `/sf-dev` (Opus) → `sf-apply-dev.sh` (draft PR) |
+| 4 test | `sf-test.sh` — **deterministic exit-code gate** (no LLM) |
+| 5 deploy | `sf-prod.sh` (**human-run**) + `/sf-prod` summary |
+| dispatcher | `sf-dispatcher.sh` multi-stage; per-project timer template + `sf-dispatcher-run.sh` |
+| notifications | `sf-notify.sh` per-project Slack (live-verified on #social) |
+| onboarding | `/sf-install --repo --gh-token-item --slack-channel [--enable-timer]` |
+| gh-agnostic | no hardcoded repo/account; `GH_TOKEN`; clean guard if unresolvable |
 
-## Key Facts
-- Skill is invoked **namespaced**: `/softwarefactory:sf-triage <n>` — bare `/sf-triage` does NOT resolve
-- Trusted/untrusted split: skill only classifies (advisory JSON); `scripts/sf-apply-label.sh` validates it's exactly `bug|feature|spam` before swapping the GitHub label. This survives the skill disobeying "JSON only"
-- Refresh mechanics: `marketplace update` = metadata only; `plugin update` = no-op at same version; **uninstall+reinstall** (= `sf-dev-sync.sh`) is the only reliable content refresh
-- `scripts/*.sh` run live from repo (no refresh); only `commands/*.md` need dev-sync
-- Session was on Opus 4.8 (1M context) — hit "usage credits required for 1M context" error; switch via `/usage-credits` or `/model`
+## Pending ⬜
+- **High:** Feedback ingestion endpoint (Stage 0 button/HTTP → issue) — the real user entry point
+- **High:** Live Nuclaw deploy — enable a real systemd per-project timer; create Vaultwarden PAT items, set `SF_GH_TOKEN_ITEM`
+- **Medium:** Real end-to-end run on a production app (`databeacon/localr5`, needs a subproject venv)
+- **Medium:** Global concurrency cap on live `sf-*` tmux sessions across repos
+- **Low:** Formal rollback command; cleanup cron (worktree/tmux); metrics
+- **Low:** Delete parked fixture #4; remove superseded single-repo systemd units
 
-## Resume
-```bash
-claude --resume 05063ee0-920d-456d-a0f3-db3179cb1eb3
-```
+## Key facts
+- Skills invoked **namespaced**: `/softwarefactory:sf-triage <n>`
+- **Advisory/trusted split** everywhere: skills emit advisory output (JSON/markers) to a machine-local log; trusted `sf-apply-*.sh` validate + do the one label transition. Deterministic stages (test/deploy) gate on real exit code, never LLM.
+- `sf:*` labels are **additive** stage markers; `feedback/bug|feature` kept as permanent classification.
+- Editing `commands/*.md` needs `bash scripts/sf-dev-sync.sh` (install caches a version-pinned copy); `scripts/*.sh` run live.
+- A setup specifies **repo + gh account + slack channel** (via `/sf-install` flags).
+- Secrets: never on disk — `GH_TOKEN` (timers) and the Slack token fetched from Vaultwarden at runtime; env files store only item *names*.
+
+## Design doc
+[2026.07.26.Software_Factory_Design.md](2026.07.26.Software_Factory_Design.md) — see the **Status snapshot** and **Implementation Manifest** for authoritative build status.
