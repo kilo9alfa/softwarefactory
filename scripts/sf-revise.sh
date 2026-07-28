@@ -101,7 +101,7 @@ fi
 
 # --- clear retry markers (so the re-run isn't blocked by the retry cap) --------
 for s in $clear_markers; do
-    run "rm -f \"$LOG_DIR/$s-$ISSUE.attempts\" \"$LOG_DIR/$s-$ISSUE.log\""
+    run "rm -f \"$LOG_DIR/$s-$ISSUE.attempts\" \"$LOG_DIR/$s-$ISSUE.log\" \"$LOG_DIR/$s-$ISSUE.gaveup\""
 done
 echo "  ✓ cleared retry markers: $clear_markers"
 
