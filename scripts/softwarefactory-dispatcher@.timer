@@ -1,0 +1,14 @@
+[Unit]
+Description=Software Factory dispatcher timer for %i
+Documentation=https://github.com/kilo9alfa/softwarefactory
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+# Stagger instances so N repos don't all fire at once and spike Claude usage.
+RandomizedDelaySec=90
+Persistent=true
+Unit=softwarefactory-dispatcher@%i.service
+
+[Install]
+WantedBy=timers.target

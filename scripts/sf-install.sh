@@ -19,6 +19,9 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
     exit 0
 fi
 
+ENABLE_TIMER=0
+[ "${1:-}" = "--enable-timer" ] && { ENABLE_TIMER=1; shift; }
+
 ok()   { echo "  ✓ $*"; }
 warn() { echo "  ⚠️  $*"; }
 bad()  { echo "  ✗ $*"; }
@@ -82,5 +85,41 @@ echo "  2. Point your app's feedback button (or CLI) at: gh issue create --label
 echo "  3. On the factory host, run the dispatcher for this repo:"
 echo "       SF_REPO_DIR=$(pwd) bash <softwarefactory>/scripts/sf-dispatcher.sh"
 echo "     (or add a systemd timer per the runbook)."
+if [ "$ENABLE_TIMER" -eq 1 ]; then
+    echo ""
+    echo "[5/5] Per-project dispatcher timer"
+    slug=$(echo "$repo" | tr '/' '-')
+    owner="${repo%%/*}"
+    cfg="$HOME/.config/softwarefactory"; mkdir -p "$cfg"
+    envf="$cfg/$slug.env"
+    if [ -f "$envf" ]; then
+        ok "env file exists: $envf (leaving it)"
+    else
+        cat > "$envf" <<EOF
+SF_REPO_DIR=$(pwd)
+SF_REPO=$repo
+# Vaultwarden item holding THIS repo's gh PAT — pins identity per repo (solves
+# the multi-account 'active gh account drifts' problem). REQUIRED for correctness.
+# e.g. SF_GH_TOKEN_ITEM=GitHub PAT — $owner
+SF_GH_TOKEN_ITEM=
+# Optional: Vaultwarden item for the Slack bot token (default is kilo9alfa-nuclaw)
+# SF_SLACK_ITEM=Slack Bot Token — kilo9alfa-nuclaw
+EOF
+        ok "wrote $envf"
+        warn "set SF_GH_TOKEN_ITEM in $envf before relying on the timer (else it uses the machine's active gh account)"
+    fi
+    if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+        ud="$HOME/.config/systemd/user"; mkdir -p "$ud"
+        cp "$SCRIPT_DIR/softwarefactory-dispatcher@.service" "$SCRIPT_DIR/softwarefactory-dispatcher@.timer" "$ud/"
+        systemctl --user daemon-reload
+        systemctl --user enable --now "softwarefactory-dispatcher@$slug.timer" 2>&1 | sed 's/^/    /'
+        ok "enabled softwarefactory-dispatcher@$slug.timer (every 5 min, staggered)"
+    else
+        warn "systemd --user not available here (e.g. macOS) — env file written. On the factory host (Nuclaw):"
+        echo "       cp $SCRIPT_DIR/softwarefactory-dispatcher@.{service,timer} ~/.config/systemd/user/"
+        echo "       systemctl --user daemon-reload && systemctl --user enable --now softwarefactory-dispatcher@$slug.timer"
+    fi
+fi
+
 echo ""
 echo "✅ $repo is Software Factory-compliant."

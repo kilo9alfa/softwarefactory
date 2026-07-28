@@ -35,8 +35,12 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-prod.sh` — **stage 5 (human-run):** runs `.sf.yml` `deploy:`, gates on exit code → **+**`sf:deployed` (closes issue) \| **+**`sf:deploy-failed`; invokes `/sf-prod` for the report. **Never dispatcher-launched.**
 - ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev / test; parks at `sf:plan-review` (human approves) and `sf:ready-for-prod` (human runs `sf-prod.sh`)
 
+**Notifications & multi-repo timers**
+- ✅ `sf-notify.sh` — per-project Slack post (best-effort). Channel from `.sf.yml` `slack_channel:`; token shared (Vaultwarden `Slack Bot Token — kilo9alfa-nuclaw` or `SF_SLACK_TOKEN`). Every stage transition notifies. Verified live on `#social`.
+- ✅ Per-project dispatcher timers: `softwarefactory-dispatcher@<slug>.{service,timer}` template + `sf-dispatcher-run.sh` (fetches `GH_TOKEN` from Vaultwarden at runtime → pins each repo's identity). Enable via `sf-install.sh --enable-timer` (writes `~/.config/softwarefactory/<slug>.env`; set `SF_GH_TOKEN_ITEM`). **Live enable is a Nuclaw step** (no systemd on macOS).
+
 **Per-project config & self-test**
-- ✅ `.sf.yml` (repo root) — `test:` command consumed by stage 4; `deploy`/`staging_url` reserved for stage 5
+- ✅ `.sf.yml` (repo root) — `test:` (stage 4), `deploy:` (stage 5), `slack_channel:` (notifications); `staging_url` reserved
 - ✅ `tests/smoke.sh` — this repo's own test (syntax-checks scripts, validates skill frontmatter + JSON manifests); wired as `.sf.yml` `test:`
 
 **Multi-repo / onboarding**

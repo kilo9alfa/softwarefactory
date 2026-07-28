@@ -1,0 +1,23 @@
+[Unit]
+# Per-project Software Factory dispatcher. %i = repo slug (owner-repo), e.g.
+#   systemctl --user enable --now softwarefactory-dispatcher@databeacon-localr5.timer
+# Each instance reads its own env file, which pins SF_REPO_DIR and the Vaultwarden
+# item holding this repo's gh token — so repos across accounts never collide.
+Description=Software Factory dispatcher for %i
+Documentation=https://github.com/kilo9alfa/softwarefactory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Per-instance config: SF_REPO_DIR, SF_REPO, SF_GH_TOKEN_ITEM, [SF_SLACK_ITEM]
+EnvironmentFile=%h/.config/softwarefactory/%i.env
+Environment="PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="HOME=%h"
+# The wrapper fetches GH_TOKEN from Vaultwarden at runtime (never stored on disk).
+ExecStart=/bin/bash %h/code/softwarefactory/scripts/sf-dispatcher-run.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
