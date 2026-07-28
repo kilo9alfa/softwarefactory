@@ -14,6 +14,7 @@ set -euo pipefail
 #   contains the spec markdown inside a <!--SPEC--> ... <!--/SPEC--> block.
 
 REPO="${SF_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo kilo9alfa/softwarefactory)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 mkdir -p "$LOG_DIR"
 
@@ -57,4 +58,5 @@ gh issue comment "$issue_num" --repo "$REPO" --body "$comment_body"
 # Advance the state machine: add sf:spec, keep the classification label.
 gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:spec"
 
+bash "$SCRIPT_DIR/sf-notify.sh" "✅ Spec ready for #${issue_num} — tickets next" >/dev/null 2>&1 || true
 log "Issue #$issue_num state transition complete (sf:spec)"

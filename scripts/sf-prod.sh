@@ -68,9 +68,11 @@ if [ "$rc" -eq 0 ]; then
     gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:deployed"
     gh issue comment "$issue_num" --repo "$REPO" --body "$(printf '🏭🚀 **Shipped** (stage 5) — `%s` exited 0.\n\n%s' "$deploy_cmd" "$summary")" 2>/dev/null || true
     gh issue close "$issue_num" --repo "$REPO" --reason completed 2>/dev/null || true
+    bash "$SCRIPT_DIR/sf-notify.sh" "🚀 Shipped #${issue_num} to production — issue closed" "$wt" >/dev/null 2>&1 || true
     log "Issue #$issue_num -> sf:deployed (closed)"
 else
     gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:deploy-failed"
     gh issue comment "$issue_num" --repo "$REPO" --body "$(printf '🏭🔴 **Deploy FAILED** (stage 5) — `%s` exited %s.\n\n%s\n\n<details><summary>deploy log</summary>\n\n```\n%s\n```\n</details>' "$deploy_cmd" "$rc" "$summary" "$log_tail")" 2>/dev/null || true
+    bash "$SCRIPT_DIR/sf-notify.sh" "🔴 Deploy FAILED for #${issue_num} — see the issue for the log" "$wt" >/dev/null 2>&1 || true
     log "Issue #$issue_num -> sf:deploy-failed"
 fi

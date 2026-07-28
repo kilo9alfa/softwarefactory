@@ -17,6 +17,7 @@ set -euo pipefail
 #   containing the ticket JSON (optionally inside a ```json fence).
 
 REPO="${SF_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo kilo9alfa/softwarefactory)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 mkdir -p "$LOG_DIR"
 
@@ -86,4 +87,5 @@ gh issue comment "$issue_num" --repo "$REPO" --body "$comment_body"
 # Advance the state machine: add sf:tickets, keep prior labels.
 gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:tickets"
 
+bash "$SCRIPT_DIR/sf-notify.sh" "🎯 Tickets ready for #${issue_num} (${ticket_count} slices) — planning next" >/dev/null 2>&1 || true
 log "Issue #$issue_num state transition complete (sf:tickets)"

@@ -12,6 +12,7 @@ set -euo pipefail
 # Usage: sf-approve-plan.sh <issue-number>
 
 REPO="${SF_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo kilo9alfa/softwarefactory)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 mkdir -p "$LOG_DIR"
 
@@ -33,4 +34,5 @@ fi
 
 gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:plan-approved"
 gh issue comment "$issue_num" --repo "$REPO" --body "🏭 **Plan approved** by a human — ready for stage 3b (dev)." 2>/dev/null || true
+bash "$SCRIPT_DIR/sf-notify.sh" "✅ Plan approved on #${issue_num} — dev will start" >/dev/null 2>&1 || true
 log "Issue #$issue_num approved (sf:plan-approved) — dev may begin"

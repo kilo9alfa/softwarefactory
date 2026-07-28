@@ -12,6 +12,7 @@ set -euo pipefail
 # Usage: sf-apply-dev.sh <issue-number> <worktree-path> <dev-log-file>
 
 REPO="${SF_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo kilo9alfa/softwarefactory)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 mkdir -p "$LOG_DIR"
 
@@ -73,4 +74,5 @@ gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:implemented"
 [ -n "$pr_url" ] && gh issue comment "$issue_num" --repo "$REPO" \
     --body "🏭 **Implemented** (stage 3b) — draft PR: ${pr_url}. Review before merge." 2>/dev/null || true
 
+bash "$SCRIPT_DIR/sf-notify.sh" "🔀 #${issue_num} implemented — draft PR ready for review: ${pr_url:-<none>}" "$wt" >/dev/null 2>&1 || true
 log "Issue #$issue_num state transition complete (sf:implemented)"

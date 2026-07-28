@@ -56,10 +56,12 @@ log "Issue #$issue_num: test command exit=$rc"
 if [ "$rc" -eq 0 ]; then
     gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:ready-for-prod"
     gh issue comment "$issue_num" --repo "$REPO" --body "$(printf '🏭 **Tests pass** (stage 4) — `%s` exited 0. Ready for production.\n\n<details><summary>output</summary>\n\n```\n%s\n```\n</details>' "$test_cmd" "$tail_out")" 2>/dev/null || true
+    bash "$SCRIPT_DIR/sf-notify.sh" "✅ Tests pass on #${issue_num} — ready for production" "$wt" >/dev/null 2>&1 || true
     log "Issue #$issue_num -> sf:ready-for-prod"
 else
     gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:needs-debug"
     gh issue comment "$issue_num" --repo "$REPO" --body "$(printf '🏭 **Tests FAILED** (stage 4) — `%s` exited %s. Needs debugging.\n\n```\n%s\n```' "$test_cmd" "$rc" "$tail_out")" 2>/dev/null || true
+    bash "$SCRIPT_DIR/sf-notify.sh" "❌ Tests FAILED on #${issue_num} — needs debugging" "$wt" >/dev/null 2>&1 || true
     log "Issue #$issue_num -> sf:needs-debug"
 fi
 rm -f "$out"
