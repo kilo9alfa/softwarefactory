@@ -6,7 +6,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Design Document:** [docs/2026.07.26.Software_Factory_Design.md](docs/2026.07.26.Software_Factory_Design.md)
 
-## Current Phase: Pipeline complete (stages 0–5) — onboarding (`/sf-install`) next
+## Current Phase: Pipeline complete (stages 0–5) + one-command onboarding
 
 ### What's Built
 
@@ -41,8 +41,9 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Multi-repo / onboarding**
 - ✅ Skills + scripts are **repo-aware** — no hardcoded repo; `gh` targets the current working directory's repo (override scripts with `SF_REPO`). One user-scope install serves every repo. Verified on `databeacon/localr5` (under `david4aero`).
-- ✅ `sf-init-labels.sh [owner/repo]` — bootstrap the label state machine on any repo (idempotent). Precursor to a future `/sf-install` one-command onboarding.
-- ⚠️ For DataBeacon repos: `gh auth switch --user david4aero` first; restore `kilo9alfa` after.
+- ✅ **`/sf-install`** (skill → `sf-install.sh`) — one-command onboarding: prereq checks (git, `gh` auth **+ identity-mismatch warning**, `jq`, `tmux`), bootstrap labels, scaffold `.sf.yml` if absent, compliance report. Idempotent; never overwrites existing config.
+- ✅ `sf-init-labels.sh [owner/repo]` — labels-only primitive (called by `sf-install.sh`).
+- ⚠️ For DataBeacon repos: `gh auth switch --user david4aero` first; restore `kilo9alfa` after. (The `gh` active account drifts across sessions — `sf-install` warns on mismatch.)
 
 **State machine**
 - ✅ GitHub labels (full pipeline): `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` → **+**`sf:implemented` → **+**`sf:ready-for-prod` \| `sf:needs-debug` → *(human)* **+**`sf:deployed` (closed) \| `sf:deploy-failed` (`sf:*` are additive; classification kept as permanent metadata)
