@@ -32,6 +32,9 @@ fi
 # Token: env first, then Vaultwarden (Nuclaw). Never hardcode.
 token="${SF_SLACK_TOKEN:-}"
 if [ -z "$token" ] && command -v bw >/dev/null 2>&1; then
+    # Load the persistent Vaultwarden session (non-interactive shells / standalone
+    # calls don't inherit it; the systemd wrapper sets it but direct calls don't).
+    export BW_SESSION="${BW_SESSION:-$(cat "$HOME/.config/bw-session" 2>/dev/null || echo "")}"
     token=$(bw get password "${SF_SLACK_ITEM:-Slack Bot Token — kilo9alfa-nuclaw}" 2>/dev/null || echo "")
 fi
 if [ -z "$token" ]; then
