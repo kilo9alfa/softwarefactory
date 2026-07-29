@@ -22,7 +22,7 @@ issue_num="${1:?usage: sf-test.sh <issue-number>}"
 
 # Idempotency + stage guards.
 current_labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-if echo "$current_labels" | grep -qE "^sf:ready-for-prod$|^sf:needs-debug$"; then
+if echo "$current_labels" | grep -qE "^sf:ready-for-prod$|^sf:needs-debug$|^sf:test-skipped$"; then
     log "Issue #$issue_num: already tested, skipping"; exit 0
 fi
 if ! echo "$current_labels" | grep -qx "sf:implemented"; then
@@ -42,8 +42,17 @@ case "$test_cmd" in
 esac
 
 if [ -z "$test_cmd" ]; then
-    log "Issue #$issue_num: no .sf.yml 'test:' command — cannot gate, leaving sf:implemented"
-    gh issue comment "$issue_num" --repo "$REPO" --body "🏭 **Test skipped** — no \`test:\` command in \`.sf.yml\`. Add one to enable stage 4 gating." 2>/dev/null || true
+    # TERMINAL, not a retry. This used to leave sf:implemented in place and exit
+    # 1, which made the issue a test candidate again on the next 5-min cycle: the
+    # dispatcher respawned it, burned the 3-attempt cap and fired a 🛑 "needs a
+    # human" alert — for a repo-config gap that no amount of retrying can fix.
+    # sf:test-skipped stops the loop and says exactly what is missing. The issue
+    # holds at stage 4 on purpose: a human adds the test: command (then removes
+    # the label to re-run) or ships it deliberately with sf:ready-for-prod.
+    log "Issue #$issue_num: no .sf.yml 'test:' command — cannot gate -> sf:test-skipped"
+    gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:test-skipped" 2>/dev/null || true
+    gh issue comment "$issue_num" --repo "$REPO" --body "🏭 **Test skipped** — no \`test:\` command in \`.sf.yml\`, so stage 4 cannot gate this. Held at \`sf:test-skipped\`. Add a \`test:\` command and remove the label to re-run, or add \`sf:ready-for-prod\` to ship it ungated." 2>/dev/null || true
+    bash "$SCRIPT_DIR/sf-notify.sh" "⚠️ #${issue_num} held at stage 4 — the repo's .sf.yml has no \`test:\` command, so nothing can gate it. Not a code failure." "$wt" >/dev/null 2>&1 || true
     exit 1
 fi
 

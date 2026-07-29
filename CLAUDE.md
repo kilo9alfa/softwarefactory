@@ -32,7 +32,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-approve-plan.sh` — **human approval action**: `sf:plan-review` → **+**`sf:plan-approved`
 - ✅ `sf-prep-worktree.sh` — isolated `wt-impl-N` (branch `sf/impl-N`), namespaced per repo under `~/sf-worktrees/`
 - ✅ `sf-apply-dev.sh` — push branch, open **draft PR**, **+**`sf:implemented`
-- ✅ `sf-test.sh` — **stage 4 (script-only, no LLM):** checks out `sf/impl-N`, runs `.sf.yml` `test:`, gates on **exit code** → **+**`sf:ready-for-prod` (0) \| **+**`sf:needs-debug` (≠0)
+- ✅ `sf-test.sh` — **stage 4 (script-only, no LLM):** checks out `sf/impl-N`, runs `.sf.yml` `test:`, gates on **exit code** → **+**`sf:ready-for-prod` (0) \| **+**`sf:needs-debug` (≠0) \| **+**`sf:test-skipped` (no `test:` command at all)
 - ✅ `sf-prod.sh` — **stage 5 (human-run):** runs `.sf.yml` `deploy:`, gates on exit code → **+**`sf:deployed` (closes issue) \| **+**`sf:deploy-failed`; invokes `/sf-prod` for the report. **Never dispatcher-launched.**
 - ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev / test; parks at `sf:plan-review` (human approves) and `sf:ready-for-prod` (human runs `sf-prod.sh`)
 
@@ -115,6 +115,7 @@ Commands are namespaced by plugin. Invoke the skill as **`/softwarefactory:sf-tr
 | `sf:implemented` | Violet | Code implemented; **draft PR open** for review | `/sf-dev` → `sf-apply-dev.sh` |
 | `sf:ready-for-prod` | Green | Tests pass; awaiting human stage-5 trigger | `sf-test.sh` (exit 0) |
 | `sf:needs-debug` | Red | Tests failed; needs debugging | `sf-test.sh` (exit ≠0) |
+| `sf:test-skipped` | Grey | Repo has no `.sf.yml` `test:` — stage 4 **could not gate**; not a code failure. Terminal: add a `test:` and remove the label to re-run, or add `sf:ready-for-prod` to ship ungated | `sf-test.sh` (no `test:`) |
 | `sf:deployed` | Blue | Deployed to production; **issue closed** | `sf-prod.sh` (exit 0) |
 | `sf:deploy-failed` | Red | Production deploy failed | `sf-prod.sh` (exit ≠0) |
 

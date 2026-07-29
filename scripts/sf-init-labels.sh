@@ -34,6 +34,7 @@ LABELS=(
     "sf:ready-for-prod|C2E0C6|Tests pass; awaiting production deploy"
     "sf:deployed|1D76DB|Deployed to production"
     "sf:needs-debug|B60205|Tests failed; needs debugging"
+    "sf:test-skipped|D9D9D9|Repo has no .sf.yml test: command; stage 4 could not gate"
     "sf:deploy-failed|E11D21|Production deploy failed"
 )
 

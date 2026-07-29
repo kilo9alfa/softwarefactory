@@ -15,7 +15,12 @@ set -euo pipefail
 #   tickets: sf:spec                         -> sf-totickets -> sf-apply-tickets.sh (done: sf:tickets)
 #   plan   : sf:tickets                      -> sf-plan      -> sf-apply-plan.sh    (done: sf:plan-review|sf:plan-approved)
 #   dev    : sf:plan-approved                -> sf-dev       -> sf-apply-dev.sh     (done: sf:implemented) [writes: worktree + draft PR]
-#   test   : sf:implemented                  -> (script-only) sf-test.sh           (done: sf:ready-for-prod|sf:needs-debug) [runs .sf.yml test:]
+#   test   : sf:implemented                  -> (script-only) sf-test.sh           (done: sf:ready-for-prod|sf:needs-debug|sf:test-skipped) [runs .sf.yml test:]
+#
+# Every stage's "done" set must be TERMINAL for that stage — an outcome the stage
+# can reach but that stops it being a candidate. A stage that can finish without
+# reaching one loops until the retry cap and pages a human for nothing; that is
+# what sf:test-skipped fixes for repos with no test: command (2026.07.29).
 #
 # Plan GENERATION is autonomous; plan APPROVAL is human-only (sf-approve-plan.sh
 # adds sf:plan-approved). The dispatcher never advances past sf:plan-review.
@@ -159,6 +164,11 @@ process_dev() {
 spawn_test() {
     local issue_num="$1"
     local session_name="sf-test-${issue_num}"
+    # The gave-up alert tells a human to "see test-<N>.log". This stage used to
+    # be the only one that never wrote one — its output went to the tmux pane and
+    # died with the session — so the alert pointed at a file that had never
+    # existed. Tee like spawn()/spawn_dev() do.
+    local log_file="$LOG_DIR/test-${issue_num}.log"
     if session_exists "$session_name"; then
         log "[test] session $session_name already running, skipping #$issue_num"; return 0
     fi
@@ -169,7 +179,7 @@ spawn_test() {
     log "[test] spawning tester for #$issue_num in $session_name"
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
         "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; \
-         timeout -k 30s ${SESSION_TIMEOUT}s bash '${FACTORY_DIR}/scripts/sf-test.sh' ${issue_num}; rc=\$?; \
+         timeout -k 30s ${SESSION_TIMEOUT}s bash '${FACTORY_DIR}/scripts/sf-test.sh' ${issue_num} 2>&1 | tee '${log_file}'; rc=\${PIPESTATUS[0]}; \
          if [ \$rc -eq 124 ]; then bash '${FACTORY_DIR}/scripts/sf-notify.sh' \"⏱️ #${issue_num} 'test' run hung >${SESSION_TIMEOUT}s and was killed — will retry until the ${RETRY_MAX}-try cap.\" '${REPO_DIR}' >/dev/null 2>&1; fi; \
          tmux kill-session -t ${session_name}"
 }
@@ -184,7 +194,10 @@ process_test() {
     while IFS= read -r issue_num; do
         [ -z "$issue_num" ] && continue
         labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-        if echo "$labels" | grep -qE "^sf:ready-for-prod$|^sf:needs-debug$"; then
+        # sf:test-skipped is terminal too — the repo has no test: command, so
+        # respawning can only produce the same non-answer. Without it here the
+        # issue stayed a candidate forever and burned its retries into a 🛑.
+        if echo "$labels" | grep -qE "^sf:ready-for-prod$|^sf:needs-debug$|^sf:test-skipped$"; then
             log "[test] #$issue_num already tested, skipping"; continue
         fi
         spawn_test "$issue_num" || log "[test] failed to spawn for #$issue_num"
