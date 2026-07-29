@@ -94,7 +94,10 @@ run_one_action() {
         deploy)
             local dcmd; dcmd=$(sed -n 's/^deploy:[[:space:]]*//p' "$repo_dir/.sf.yml" 2>/dev/null | head -1)
             [ -z "$dcmd" ] && { log "deploy: no 'deploy:' command in .sf.yml"; return 1; }
-            ( cd "$repo_dir" && eval "$dcmd" ) >"$LOG_DIR/deploy-$issue.log" 2>&1 || return 1
+            # SF_ISSUE: unlike the stage-5 path this runs in the MAIN checkout on
+            # the default branch — there is no sf/impl-<N> branch to infer the
+            # issue from, so a per-issue-routing deploy: hook depends on this.
+            ( cd "$repo_dir" && export SF_ISSUE="$issue" && eval "$dcmd" ) >"$LOG_DIR/deploy-$issue.log" 2>&1 || return 1
             ;;
         *) return 1 ;;
     esac

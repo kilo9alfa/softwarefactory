@@ -53,7 +53,10 @@ fi
 # Run the deploy (deterministic gate).
 prod_log="$LOG_DIR/prod-${issue_num}.log"
 log "Issue #$issue_num: deploying via \`$deploy_cmd\` in $wt"
-( cd "$wt" && eval "$deploy_cmd" ) >"$prod_log" 2>&1
+# SF_ISSUE: the hook runs in a CHILD process, so a repo whose deploy: command
+# routes per-issue (e.g. by an issue label) has no other way to learn which
+# issue it is. Exported here so it never has to infer it from the branch name.
+( cd "$wt" && export SF_ISSUE="$issue_num" && eval "$deploy_cmd" ) >"$prod_log" 2>&1
 rc=$?
 log "Issue #$issue_num: deploy command exit=$rc"
 

@@ -58,7 +58,10 @@ fi
 
 log "Issue #$issue_num: running \`$test_cmd\` in $wt"
 out=$(mktemp)
-( cd "$wt" && eval "$test_cmd" ) >"$out" 2>&1
+# SF_ISSUE: the hook runs in a CHILD process, so a repo whose test: command
+# routes per-issue (e.g. by an issue label) has no other way to learn which
+# issue it is. Exported here so it never has to infer it from the branch name.
+( cd "$wt" && export SF_ISSUE="$issue_num" && eval "$test_cmd" ) >"$out" 2>&1
 rc=$?
 tail_out=$(tail -n 60 "$out")
 log "Issue #$issue_num: test command exit=$rc"

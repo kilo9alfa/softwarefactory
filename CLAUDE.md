@@ -43,6 +43,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Per-project config & self-test**
 - ✅ `.sf.yml` (repo root) — `test:` (stage 4), `deploy:` (stage 5), `slack_channel:` (notifications); `staging_url` reserved
+- ✅ **Hook contract:** `test:`/`deploy:` are `eval`'d in a **child** process, so a hook cannot see the caller's shell variables. **`SF_ISSUE` is exported** at all three call sites (`sf-test.sh`, `sf-prod.sh`, and the Slack `deploy` reply in `sf-slack-commands.sh`) — that is the supported way for a hook to know which issue it is running for. A repo that routes per-issue (e.g. `databeacon/localr5` maps an issue's `area:*` label to a subproject's build/test/deploy) reads it instead of parsing the `sf/impl-<N>` branch name, which the Slack path doesn't have (it runs in the main checkout on the default branch). `cwd` is the worktree for stages 4/5 and the main checkout for the Slack reply
 - ✅ `tests/smoke.sh` — this repo's own test (syntax-checks scripts, validates skill frontmatter + JSON manifests); wired as `.sf.yml` `test:`
 
 **Multi-repo / onboarding**
