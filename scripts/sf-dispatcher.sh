@@ -39,7 +39,18 @@ REPO="${SF_REPO:-$(cd "$REPO_DIR" && gh repo view --json nameWithOwner -q .nameW
 FACTORY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${HOME}/.local/share/softwarefactory/logs"
 RETRY_MAX=3
-SESSION_TIMEOUT=900  # 15 minutes — spec/tickets explore the codebase
+# Per-stage session budgets. These were ONE number (900s) for every stage, which
+# is wrong in both directions: triage is a few seconds of Haiku, while a dev task
+# whose plan says "rebuild the image, then drive a browser against the running
+# container" cannot finish inside it. localr5 #108 burned two attempts that way —
+# each killed at 899s with the work complete but UNCOMMITTED, so sf-apply-dev saw
+# 0 commits and the stage never advanced. Nothing about retrying could fix it;
+# the budget was the bug.
+# Override per repo in ~/.config/softwarefactory/<slug>.env (sf-dispatcher-run.sh
+# sources it) when a repo's dev/test work is heavier still.
+SESSION_TIMEOUT="${SF_SESSION_TIMEOUT:-900}"    # 15 min — triage/spec/tickets/plan: read + write markdown
+DEV_TIMEOUT="${SF_DEV_TIMEOUT:-3600}"           # 60 min — implement + build + verify against a live stack
+TEST_TIMEOUT="${SF_TEST_TIMEOUT:-1800}"         # 30 min — a test: may rebuild an image or run a parity check
 
 mkdir -p "$LOG_DIR"
 
@@ -136,8 +147,8 @@ spawn_dev() {
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
         "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; \
          wt=\$(bash '${FACTORY_DIR}/scripts/sf-prep-worktree.sh' ${issue_num}) && cd \"\$wt\" && \
-         timeout -k 30s ${SESSION_TIMEOUT}s claude --dangerously-skip-permissions -p '/softwarefactory:sf-dev ${issue_num}' 2>&1 | tee '${log_file}'; rc=\${PIPESTATUS[0]}; \
-         if [ \$rc -eq 124 ]; then bash '${FACTORY_DIR}/scripts/sf-notify.sh' \"⏱️ #${issue_num} 'dev' agent hung >${SESSION_TIMEOUT}s and was killed — will retry until the ${RETRY_MAX}-try cap.\" '${REPO_DIR}' >/dev/null 2>&1; fi; \
+         timeout -k 30s ${DEV_TIMEOUT}s claude --dangerously-skip-permissions -p '/softwarefactory:sf-dev ${issue_num}' 2>&1 | tee '${log_file}'; rc=\${PIPESTATUS[0]}; \
+         if [ \$rc -eq 124 ]; then bash '${FACTORY_DIR}/scripts/sf-notify.sh' \"⏱️ #${issue_num} 'dev' agent hung >${DEV_TIMEOUT}s and was killed — will retry until the ${RETRY_MAX}-try cap.\" '${REPO_DIR}' >/dev/null 2>&1; fi; \
          timeout -k 10s 180s bash '${FACTORY_DIR}/scripts/sf-apply-dev.sh' ${issue_num} \"\$wt\" '${log_file}'; \
          tmux kill-session -t ${session_name}"
 }
@@ -179,8 +190,8 @@ spawn_test() {
     log "[test] spawning tester for #$issue_num in $session_name"
     tmux new-session -d -s "$session_name" -x 200 -y 50 \
         "export SF_REPO='${REPO}' SF_REPO_DIR='${REPO_DIR}'; \
-         timeout -k 30s ${SESSION_TIMEOUT}s bash '${FACTORY_DIR}/scripts/sf-test.sh' ${issue_num} 2>&1 | tee '${log_file}'; rc=\${PIPESTATUS[0]}; \
-         if [ \$rc -eq 124 ]; then bash '${FACTORY_DIR}/scripts/sf-notify.sh' \"⏱️ #${issue_num} 'test' run hung >${SESSION_TIMEOUT}s and was killed — will retry until the ${RETRY_MAX}-try cap.\" '${REPO_DIR}' >/dev/null 2>&1; fi; \
+         timeout -k 30s ${TEST_TIMEOUT}s bash '${FACTORY_DIR}/scripts/sf-test.sh' ${issue_num} 2>&1 | tee '${log_file}'; rc=\${PIPESTATUS[0]}; \
+         if [ \$rc -eq 124 ]; then bash '${FACTORY_DIR}/scripts/sf-notify.sh' \"⏱️ #${issue_num} 'test' run hung >${TEST_TIMEOUT}s and was killed — will retry until the ${RETRY_MAX}-try cap.\" '${REPO_DIR}' >/dev/null 2>&1; fi; \
          tmux kill-session -t ${session_name}"
 }
 

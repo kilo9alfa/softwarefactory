@@ -35,6 +35,7 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ✅ `sf-test.sh` — **stage 4 (script-only, no LLM):** checks out `sf/impl-N`, runs `.sf.yml` `test:`, gates on **exit code** → **+**`sf:ready-for-prod` (0) \| **+**`sf:needs-debug` (≠0) \| **+**`sf:test-skipped` (no `test:` command at all)
 - ✅ `sf-prod.sh` — **stage 5 (human-run):** runs `.sf.yml` `deploy:`, gates on exit code → **+**`sf:deployed` (closes issue) \| **+**`sf:deploy-failed`; invokes `/sf-prod` for the report. **Never dispatcher-launched.**
 - ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev / test; parks at `sf:plan-review` (human approves) and `sf:ready-for-prod` (human runs `sf-prod.sh`)
+- ⏱️ **Per-stage session budgets** (`sf-dispatcher.sh`): `SESSION_TIMEOUT` 900s (triage/spec/tickets/plan) · `DEV_TIMEOUT` **3600s** · `TEST_TIMEOUT` **1800s**. Override per repo via `SF_SESSION_TIMEOUT` / `SF_DEV_TIMEOUT` / `SF_TEST_TIMEOUT` in `~/.config/softwarefactory/<slug>.env`. One shared 900s previously killed dev agents mid-task with the work **uncommitted**, so `sf-apply-dev.sh` saw 0 commits and the stage silently never advanced (localr5 #108).
 
 **Notifications & multi-repo timers**
 - ✅ `sf-notify.sh` — per-project Slack post (best-effort). Channel from `.sf.yml` `slack_channel:`; token shared (Vaultwarden `Slack Bot Token — kilo9alfa-nuclaw` or `SF_SLACK_TOKEN`). Every stage transition notifies. Verified live on `#social`.
