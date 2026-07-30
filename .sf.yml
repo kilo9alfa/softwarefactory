@@ -3,7 +3,7 @@
 # 4–5 and will be wired as those stages land.
 
 # Stage 4 (/sf-test): shell command run in the issue's worktree. Exit 0 = pass
-# (→ sf:ready-for-prod), non-zero = fail (→ sf:needs-debug). For a monorepo,
+# (→ sf:5-ready-for-prod), non-zero = fail (→ sf:5-needs-debug). For a monorepo,
 # cd into the subproject: e.g. `cd enroute-kpis-local && python -m pytest -q`.
 test: bash tests/smoke.sh
 
@@ -15,8 +15,8 @@ test: bash tests/smoke.sh
 # slack_channel: "#softwarefactory"
 
 # Stage 5 (sf-prod.sh, human-triggered): production deploy command, run in the
-# issue's worktree. Exit 0 = deployed (→ sf:deployed, issue closed), non-zero =
-# failed (→ sf:deploy-failed). softwarefactory has no real prod target, so this
+# issue's worktree. Exit 0 = deployed (→ sf:6-deployed, issue closed), non-zero =
+# failed (→ sf:6-deploy-failed). softwarefactory has no real prod target, so this
 # is a safe placeholder that reports the plugin version.
 deploy: bash tests/smoke.sh && echo "🚀 placeholder deploy OK — softwarefactory has no real production target"
 

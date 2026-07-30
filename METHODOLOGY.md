@@ -29,21 +29,21 @@ the transition) or a human gate. Three invariants make it safe:
 ## 2. The pipeline
 
 ```
-feedback/triage → feedback/bug|feature → sf:spec → sf:tickets → sf:plan-review
-   → (human) sf:plan-approved → sf:implemented → sf:ready-for-prod | sf:needs-debug
-   → (human) sf:deployed (issue closed) | sf:deploy-failed
+feedback/triage → feedback/bug|feature → sf:1-spec → sf:2-tickets → sf:3-plan-review
+   → (human) sf:3-plan-approved → sf:4-implemented → sf:5-ready-for-prod | sf:5-needs-debug
+   → (human) sf:6-deployed (issue closed) | sf:6-deploy-failed
 ```
 
 | Stage | Label in → out | Driven by | Auto / gate |
 |---|---|---|---|
 | **0 Triage** | `feedback/triage` → `feedback/bug`\|`feature`\|`sf:spam` | `sf-triage` (Haiku) → `sf-apply-label.sh` | auto |
-| **1 Spec** | +`sf:spec` | `sf-tospecs` (Sonnet) → `sf-apply-spec.sh` | auto |
-| **2 Tickets** | +`sf:tickets` | `sf-totickets` (Opus) → `sf-apply-tickets.sh` | auto |
-| **3a Plan** | +`sf:plan-review` | `sf-plan` (Fable 5) → `sf-apply-plan.sh` | auto → **parks** |
-| **3b Approve** | +`sf:plan-approved` | **human** → `sf-approve-plan.sh` | 🚦 **gate 1** |
-| **3c Develop** | +`sf:implemented` (draft PR) | `sf-dev` (Opus) in isolated worktree → `sf-apply-dev.sh` | auto |
-| **4 Test** | +`sf:ready-for-prod` \| `sf:needs-debug` | `sf-test.sh` (**no LLM** — gates on `.sf.yml` `test:` exit code) | auto → **parks** |
-| **5 Deploy** | +`sf:deployed` (closes issue) \| `sf:deploy-failed` | **human runs** `sf-prod.sh` (`.sf.yml` `deploy:`) | 🚦 **gate 2** |
+| **1 Spec** | +`sf:1-spec` | `sf-tospecs` (Sonnet) → `sf-apply-spec.sh` | auto |
+| **2 Tickets** | +`sf:2-tickets` | `sf-totickets` (Opus) → `sf-apply-tickets.sh` | auto |
+| **3a Plan** | +`sf:3-plan-review` | `sf-plan` (Fable 5) → `sf-apply-plan.sh` | auto → **parks** |
+| **3b Approve** | +`sf:3-plan-approved` | **human** → `sf-approve-plan.sh` | 🚦 **gate 1** |
+| **3c Develop** | +`sf:4-implemented` (draft PR) | `sf-dev` (Opus) in isolated worktree → `sf-apply-dev.sh` | auto |
+| **4 Test** | +`sf:5-ready-for-prod` \| `sf:5-needs-debug` | `sf-test.sh` (**no LLM** — gates on `.sf.yml` `test:` exit code) | auto → **parks** |
+| **5 Deploy** | +`sf:6-deployed` (closes issue) \| `sf:6-deploy-failed` | **human runs** `sf-prod.sh` (`.sf.yml` `deploy:`) | 🚦 **gate 2** |
 
 `sf:*` labels are **additive** — the `feedback/bug`\|`feature` classification stays on
 the issue permanently as metadata.
@@ -54,8 +54,8 @@ the issue permanently as metadata.
 
 Everything else is autonomous. A human is required at exactly two points:
 
-1. **Plan approval** — the dispatcher parks at `sf:plan-review`. A human reads the
-   posted plan and, if good, adds `sf:plan-approved` (via `sf-approve-plan.sh`, the
+1. **Plan approval** — the dispatcher parks at `sf:3-plan-review`. A human reads the
+   posted plan and, if good, adds `sf:3-plan-approved` (via `sf-approve-plan.sh`, the
    `/sf-approve` skill, or a Slack `approve` reply). Nothing implements until then.
 2. **Code review + deploy** — `sf-dev` opens a **draft PR**; it never merges itself.
    A human reviews/merges the PR, then triggers stage 5 (`sf-prod.sh`, or a Slack
@@ -69,7 +69,7 @@ Everything else is autonomous. A human is required at exactly two points:
 |---|---|
 | **File feedback** | Open a GitHub issue with the `feedback/triage` label. The body is free text; the dispatcher picks it up within ~5 min. |
 | **See where an issue is** | Read its `sf:*` labels (see the pipeline table). |
-| **Approve a plan** | Add `sf:plan-approved` to the issue, or reply `approve` in the Slack notification thread. |
+| **Approve a plan** | Add `sf:3-plan-approved` to the issue, or reply `approve` in the Slack notification thread. |
 | **Review code** | Review the draft PR the pipeline opened; merge when satisfied. |
 | **Deploy** | Reply `deploy` in the Slack thread, or run `sf-prod.sh <issue>` on the host. |
 | **Do several at once** | Reply a sequence in-thread: `merge, deploy, close` (runs in order, stops on first failure). |

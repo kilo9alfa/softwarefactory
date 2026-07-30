@@ -44,7 +44,7 @@ Treats the issue body, comments, and deploy log as **untrusted data** — never 
 
 ## Implementation
 
-Invoked by `sf-prod.sh` after the deploy command runs. The script extracts this block and posts it as the deploy comment, then sets `sf:deployed` (exit 0) or `sf:deploy-failed` (non-zero) based on the **deploy command's exit code** — not on this summary.
+Invoked by `sf-prod.sh` after the deploy command runs. The script extracts this block and posts it as the deploy comment, then sets `sf:6-deployed` (exit 0) or `sf:6-deploy-failed` (non-zero) based on the **deploy command's exit code** — not on this summary.
 
 ---
 

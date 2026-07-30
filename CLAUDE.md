@@ -26,15 +26,15 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 
 **Trusted scripts (do every label transition; validate the skill's advisory output)**
 - ✅ `sf-apply-label.sh` — triage → `feedback/bug`\|`feature`\|`sf:spam` (rewrites title, closes spam)
-- ✅ `sf-apply-spec.sh` — extracts spec, posts comment, **+**`sf:spec`
-- ✅ `sf-apply-tickets.sh` — parses JSON, renders dependency-ordered checklist, **+**`sf:tickets`
-- ✅ `sf-apply-plan.sh` — extracts plan, posts comment, **+**`sf:plan-review` (parks at approval gate)
-- ✅ `sf-approve-plan.sh` — **human approval action**: `sf:plan-review` → **+**`sf:plan-approved`
+- ✅ `sf-apply-spec.sh` — extracts spec, posts comment, **+**`sf:1-spec`
+- ✅ `sf-apply-tickets.sh` — parses JSON, renders dependency-ordered checklist, **+**`sf:2-tickets`
+- ✅ `sf-apply-plan.sh` — extracts plan, posts comment, **+**`sf:3-plan-review` (parks at approval gate)
+- ✅ `sf-approve-plan.sh` — **human approval action**: `sf:3-plan-review` → **+**`sf:3-plan-approved`
 - ✅ `sf-prep-worktree.sh` — isolated `wt-impl-N` (branch `sf/impl-N`), namespaced per repo under `~/sf-worktrees/`
-- ✅ `sf-apply-dev.sh` — push branch, open **draft PR**, **+**`sf:implemented`
-- ✅ `sf-test.sh` — **stage 4 (script-only, no LLM):** checks out `sf/impl-N`, runs `.sf.yml` `test:`, gates on **exit code** → **+**`sf:ready-for-prod` (0) \| **+**`sf:needs-debug` (≠0) \| **+**`sf:test-skipped` (no `test:` command at all)
-- ✅ `sf-prod.sh` — **stage 5 (human-run):** runs `.sf.yml` `deploy:`, gates on exit code → **+**`sf:deployed` (closes issue) \| **+**`sf:deploy-failed`; invokes `/sf-prod` for the report. **Never dispatcher-launched.**
-- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev / test; parks at `sf:plan-review` (human approves) and `sf:ready-for-prod` (human runs `sf-prod.sh`)
+- ✅ `sf-apply-dev.sh` — push branch, open **draft PR**, **+**`sf:4-implemented`
+- ✅ `sf-test.sh` — **stage 4 (script-only, no LLM):** checks out `sf/impl-N`, runs `.sf.yml` `test:`, gates on **exit code** → **+**`sf:5-ready-for-prod` (0) \| **+**`sf:5-needs-debug` (≠0) \| **+**`sf:5-test-skipped` (no `test:` command at all)
+- ✅ `sf-prod.sh` — **stage 5 (human-run):** runs `.sf.yml` `deploy:`, gates on exit code → **+**`sf:6-deployed` (closes issue) \| **+**`sf:6-deploy-failed`; invokes `/sf-prod` for the report. **Never dispatcher-launched.**
+- ✅ `sf-dispatcher.sh` — **multi-stage** poller: launches triage / spec / tickets / plan / dev / test; parks at `sf:3-plan-review` (human approves) and `sf:5-ready-for-prod` (human runs `sf-prod.sh`)
 - ⏱️ **Per-stage session budgets** (`sf-dispatcher.sh`): `SESSION_TIMEOUT` 900s (triage/spec/tickets/plan) · `DEV_TIMEOUT` **3600s** · `TEST_TIMEOUT` **1800s**. Override per repo via `SF_SESSION_TIMEOUT` / `SF_DEV_TIMEOUT` / `SF_TEST_TIMEOUT` in `~/.config/softwarefactory/<slug>.env`. One shared 900s previously killed dev agents mid-task with the work **uncommitted**, so `sf-apply-dev.sh` saw 0 commits and the stage silently never advanced (localr5 #108).
 
 **Notifications & multi-repo timers**
@@ -54,8 +54,8 @@ The Software Factory is an autonomous feedback-to-production pipeline built as a
 - ⚠️ For DataBeacon repos: `gh auth switch --user david4aero` first; restore `kilo9alfa` after. (The `gh` active account drifts across sessions — `sf-install` warns on mismatch.)
 
 **State machine**
-- ✅ GitHub labels (full pipeline): `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:spec` → **+**`sf:tickets` → **+**`sf:plan-review` → *(human)* **+**`sf:plan-approved` → **+**`sf:implemented` → **+**`sf:ready-for-prod` \| `sf:needs-debug` → *(human)* **+**`sf:deployed` (closed) \| `sf:deploy-failed` (`sf:*` are additive; classification kept as permanent metadata)
-- **Two gates:** (1) plan *approval* — human adds `sf:plan-approved` after reading the plan (dispatcher parks at `sf:plan-review`); (2) code review — dev is autonomous but opens a **draft PR**, and a human reviews the PR before merge.
+- ✅ GitHub labels (full pipeline): `feedback/triage` → `feedback/bug`\|`feature` → **+**`sf:1-spec` → **+**`sf:2-tickets` → **+**`sf:3-plan-review` → *(human)* **+**`sf:3-plan-approved` → **+**`sf:4-implemented` → **+**`sf:5-ready-for-prod` \| `sf:5-needs-debug` → *(human)* **+**`sf:6-deployed` (closed) \| `sf:6-deploy-failed` (`sf:*` are additive; classification kept as permanent metadata)
+- **Two gates:** (1) plan *approval* — human adds `sf:3-plan-approved` after reading the plan (dispatcher parks at `sf:3-plan-review`); (2) code review — dev is autonomous but opens a **draft PR**, and a human reviews the PR before merge.
 
 > Full stage-by-stage build map: see the **Implementation Manifest** table in the design doc.
 
@@ -110,16 +110,16 @@ Commands are namespaced by plugin. Invoke the skill as **`/softwarefactory:sf-tr
 | `feedback/bug` | Red | Classified as bug | `/sf-triage` agent |
 | `feedback/feature` | Blue | Classified as feature request | `/sf-triage` agent |
 | `sf:spam` | Orange | Classified as spam | `/sf-triage` agent |
-| `sf:spec` | Cyan | Spec generated | `/sf-tospecs` → `sf-apply-spec.sh` |
-| `sf:tickets` | Yellow | Tickets broken down | `/sf-totickets` → `sf-apply-tickets.sh` |
-| `sf:plan-review` | Purple | Plan generated, **awaiting human approval** | `/sf-plan` → `sf-apply-plan.sh` |
-| `sf:plan-approved` | Green | Human approved the plan; ready for dev | **Human** → `sf-approve-plan.sh` |
-| `sf:implemented` | Violet | Code implemented; **draft PR open** for review | `/sf-dev` → `sf-apply-dev.sh` |
-| `sf:ready-for-prod` | Green | Tests pass; awaiting human stage-5 trigger | `sf-test.sh` (exit 0) |
-| `sf:needs-debug` | Red | Tests failed; needs debugging | `sf-test.sh` (exit ≠0) |
-| `sf:test-skipped` | Grey | Repo has no `.sf.yml` `test:` — stage 4 **could not gate**; not a code failure. Terminal: add a `test:` and remove the label to re-run, or add `sf:ready-for-prod` to ship ungated | `sf-test.sh` (no `test:`) |
-| `sf:deployed` | Blue | Deployed to production; **issue closed** | `sf-prod.sh` (exit 0) |
-| `sf:deploy-failed` | Red | Production deploy failed | `sf-prod.sh` (exit ≠0) |
+| `sf:1-spec` | Cyan | Spec generated | `/sf-tospecs` → `sf-apply-spec.sh` |
+| `sf:2-tickets` | Yellow | Tickets broken down | `/sf-totickets` → `sf-apply-tickets.sh` |
+| `sf:3-plan-review` | Purple | Plan generated, **awaiting human approval** | `/sf-plan` → `sf-apply-plan.sh` |
+| `sf:3-plan-approved` | Green | Human approved the plan; ready for dev | **Human** → `sf-approve-plan.sh` |
+| `sf:4-implemented` | Violet | Code implemented; **draft PR open** for review | `/sf-dev` → `sf-apply-dev.sh` |
+| `sf:5-ready-for-prod` | Green | Tests pass; awaiting human stage-5 trigger | `sf-test.sh` (exit 0) |
+| `sf:5-needs-debug` | Red | Tests failed; needs debugging | `sf-test.sh` (exit ≠0) |
+| `sf:5-test-skipped` | Grey | Repo has no `.sf.yml` `test:` — stage 4 **could not gate**; not a code failure. Terminal: add a `test:` and remove the label to re-run, or add `sf:5-ready-for-prod` to ship ungated | `sf-test.sh` (no `test:`) |
+| `sf:6-deployed` | Blue | Deployed to production; **issue closed** | `sf-prod.sh` (exit 0) |
+| `sf:6-deploy-failed` | Red | Production deploy failed | `sf-prod.sh` (exit ≠0) |
 
 ## Git Identity
 
