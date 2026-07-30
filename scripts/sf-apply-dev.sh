@@ -6,7 +6,7 @@ set -euo pipefail
 # The /sf-dev skill only writes code + commits LOCALLY in an isolated worktree.
 # This script does the outward-facing mutations: push the branch, open a DRAFT
 # PR, and advance the label state machine:
-#   sf:plan-approved  --(add)-->  sf:implemented
+#   sf:3-plan-approved  --(add)-->  sf:4-implemented
 # The PR (draft, human-reviewed before merge) is the code-review gate.
 #
 # Usage: sf-apply-dev.sh <issue-number> <worktree-path> <dev-log-file>
@@ -30,12 +30,12 @@ dev_log="${3:?usage: sf-apply-dev.sh <issue-number> <worktree-path> <dev-log-fil
 
 # Idempotency + stage guards.
 current_labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-if echo "$current_labels" | grep -qx "sf:implemented"; then
-    log "Issue #$issue_num: sf:implemented already present, skipping"
+if echo "$current_labels" | grep -qx "sf:4-implemented"; then
+    log "Issue #$issue_num: sf:4-implemented already present, skipping"
     exit 0
 fi
-if ! echo "$current_labels" | grep -qx "sf:plan-approved"; then
-    log "Issue #$issue_num: no sf:plan-approved label — not ready for dev, skipping"
+if ! echo "$current_labels" | grep -qx "sf:3-plan-approved"; then
+    log "Issue #$issue_num: no sf:3-plan-approved label — not ready for dev, skipping"
     exit 1
 fi
 
@@ -59,7 +59,7 @@ summary=$(sed -n '/<!--DEV-->/,/<!--\/DEV-->/p' "$dev_log" | sed '/<!--DEV-->/d;
 [ -z "${summary// /}" ] && summary="_(no summary emitted)_"
 
 issue_title=$(gh issue view "$issue_num" --repo "$REPO" --json title -q .title 2>/dev/null || echo "issue #$issue_num")
-pr_body="🏭 Autonomous implementation (stage 3b) — Refs #${issue_num}. Plan was human-approved (\`sf:plan-approved\`). **Draft: review before merging.**"$'\n\n'"${summary}"
+pr_body="🏭 Autonomous implementation (stage 3b) — Refs #${issue_num}. Plan was human-approved (\`sf:3-plan-approved\`). **Draft: review before merging.**"$'\n\n'"${summary}"
 
 # Open a draft PR, or reuse an existing one for this branch (retry-safe).
 if pr_url=$(gh pr create --repo "$REPO" --head "$branch" --base "$default_branch" \
@@ -71,9 +71,9 @@ else
 fi
 
 # Advance the state machine + link the PR on the issue.
-gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:implemented"
+gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:4-implemented"
 [ -n "$pr_url" ] && gh issue comment "$issue_num" --repo "$REPO" \
     --body "🏭 **Implemented** (stage 3b) — draft PR: ${pr_url}. Review before merge." 2>/dev/null || true
 
 bash "$SCRIPT_DIR/sf-notify.sh" "🔀 #${issue_num} implemented — draft PR ready for review: ${pr_url:-<none>}" "$wt" >/dev/null 2>&1 || true
-log "Issue #$issue_num state transition complete (sf:implemented)"
+log "Issue #$issue_num state transition complete (sf:4-implemented)"

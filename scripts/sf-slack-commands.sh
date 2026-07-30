@@ -86,7 +86,7 @@ run_one_action() {
             gh pr merge "$p" --repo "$REPO" --squash >/dev/null 2>&1 || return 1
             ;;
         approve)
-            gh issue edit "$issue" --repo "$REPO" --add-label sf:plan-approved >/dev/null 2>&1 || return 1
+            gh issue edit "$issue" --repo "$REPO" --add-label sf:3-plan-approved >/dev/null 2>&1 || return 1
             ;;
         close)
             gh issue close "$issue" --repo "$REPO" --reason completed --comment "Closed via Slack command." >/dev/null 2>&1 || return 1

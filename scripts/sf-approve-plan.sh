@@ -5,7 +5,7 @@ set -euo pipefail
 #
 # This is the ONE gate a human must drive. It advances a reviewed plan past the
 # gate so stage 3b (dev) can begin:
-#   sf:plan-review  --(add)-->  sf:plan-approved
+#   sf:3-plan-review  --(add)-->  sf:3-plan-approved
 #
 # Run this only after reading the plan comment on the issue and agreeing with it.
 #
@@ -24,16 +24,16 @@ log() {
 issue_num="${1:?usage: sf-approve-plan.sh <issue-number>}"
 
 current_labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-if echo "$current_labels" | grep -qx "sf:plan-approved"; then
+if echo "$current_labels" | grep -qx "sf:3-plan-approved"; then
     log "Issue #$issue_num: already approved, nothing to do"
     exit 0
 fi
-if ! echo "$current_labels" | grep -qx "sf:plan-review"; then
-    log "Issue #$issue_num: not at the plan-review gate (no sf:plan-review label), refusing"
+if ! echo "$current_labels" | grep -qx "sf:3-plan-review"; then
+    log "Issue #$issue_num: not at the plan-review gate (no sf:3-plan-review label), refusing"
     exit 1
 fi
 
-gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:plan-approved"
+gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:3-plan-approved"
 gh issue comment "$issue_num" --repo "$REPO" --body "🏭 **Plan approved** by a human — ready for stage 3b (dev)." 2>/dev/null || true
 bash "$SCRIPT_DIR/sf-notify.sh" "✅ Plan approved on #${issue_num} — dev will start" >/dev/null 2>&1 || true
-log "Issue #$issue_num approved (sf:plan-approved) — dev may begin"
+log "Issue #$issue_num approved (sf:3-plan-approved) — dev may begin"

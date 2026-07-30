@@ -11,19 +11,19 @@ set -euo pipefail
 #
 # Stage table (processed in order each cycle):
 #   triage : feedback/triage                 -> sf-triage    -> sf-apply-label.sh   (done: feedback/bug|feature|sf:spam)
-#   spec   : feedback/bug | feedback/feature -> sf-tospecs   -> sf-apply-spec.sh    (done: sf:spec)
-#   tickets: sf:spec                         -> sf-totickets -> sf-apply-tickets.sh (done: sf:tickets)
-#   plan   : sf:tickets                      -> sf-plan      -> sf-apply-plan.sh    (done: sf:plan-review|sf:plan-approved)
-#   dev    : sf:plan-approved                -> sf-dev       -> sf-apply-dev.sh     (done: sf:implemented) [writes: worktree + draft PR]
-#   test   : sf:implemented                  -> (script-only) sf-test.sh           (done: sf:ready-for-prod|sf:needs-debug|sf:test-skipped) [runs .sf.yml test:]
+#   spec   : feedback/bug | feedback/feature -> sf-tospecs   -> sf-apply-spec.sh    (done: sf:1-spec)
+#   tickets: sf:1-spec                         -> sf-totickets -> sf-apply-tickets.sh (done: sf:2-tickets)
+#   plan   : sf:2-tickets                      -> sf-plan      -> sf-apply-plan.sh    (done: sf:3-plan-review|sf:3-plan-approved)
+#   dev    : sf:3-plan-approved                -> sf-dev       -> sf-apply-dev.sh     (done: sf:4-implemented) [writes: worktree + draft PR]
+#   test   : sf:4-implemented                  -> (script-only) sf-test.sh           (done: sf:5-ready-for-prod|sf:5-needs-debug|sf:5-test-skipped) [runs .sf.yml test:]
 #
 # Every stage's "done" set must be TERMINAL for that stage — an outcome the stage
 # can reach but that stops it being a candidate. A stage that can finish without
 # reaching one loops until the retry cap and pages a human for nothing; that is
-# what sf:test-skipped fixes for repos with no test: command (2026.07.29).
+# what sf:5-test-skipped fixes for repos with no test: command (2026.07.29).
 #
 # Plan GENERATION is autonomous; plan APPROVAL is human-only (sf-approve-plan.sh
-# adds sf:plan-approved). The dispatcher never advances past sf:plan-review.
+# adds sf:3-plan-approved). The dispatcher never advances past sf:3-plan-review.
 # Dev (3b) runs autonomously in an isolated worktree and opens a DRAFT PR — the
 # PR is the human code-review gate before merge.
 
@@ -153,17 +153,17 @@ spawn_dev() {
          tmux kill-session -t ${session_name}"
 }
 
-# Process the dev stage: trigger sf:plan-approved, done sf:implemented.
+# Process the dev stage: trigger sf:3-plan-approved, done sf:4-implemented.
 process_dev() {
     local issues issue_num labels
-    issues=$(gh issue list --repo "$REPO" --state open --label "sf:plan-approved" --json number --jq '.[].number' 2>/dev/null || echo "")
+    issues=$(gh issue list --repo "$REPO" --state open --label "sf:3-plan-approved" --json number --jq '.[].number' 2>/dev/null || echo "")
     issues=$(echo "$issues" | grep -E '^[0-9]+$' | sort -u || echo "")
     [ -z "$issues" ] && return 0
     log "[dev] candidates: $(echo "$issues" | tr '\n' ' ')"
     while IFS= read -r issue_num; do
         [ -z "$issue_num" ] && continue
         labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-        if echo "$labels" | grep -qx "sf:implemented"; then
+        if echo "$labels" | grep -qx "sf:4-implemented"; then
             log "[dev] #$issue_num already implemented, skipping"; continue
         fi
         spawn_dev "$issue_num" || log "[dev] failed to spawn for #$issue_num"
@@ -195,20 +195,20 @@ spawn_test() {
          tmux kill-session -t ${session_name}"
 }
 
-# Process the test stage: trigger sf:implemented, done sf:ready-for-prod|needs-debug.
+# Process the test stage: trigger sf:4-implemented, done sf:5-ready-for-prod|needs-debug.
 process_test() {
     local issues issue_num labels
-    issues=$(gh issue list --repo "$REPO" --state open --label "sf:implemented" --json number --jq '.[].number' 2>/dev/null || echo "")
+    issues=$(gh issue list --repo "$REPO" --state open --label "sf:4-implemented" --json number --jq '.[].number' 2>/dev/null || echo "")
     issues=$(echo "$issues" | grep -E '^[0-9]+$' | sort -u || echo "")
     [ -z "$issues" ] && return 0
     log "[test] candidates: $(echo "$issues" | tr '\n' ' ')"
     while IFS= read -r issue_num; do
         [ -z "$issue_num" ] && continue
         labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-        # sf:test-skipped is terminal too — the repo has no test: command, so
+        # sf:5-test-skipped is terminal too — the repo has no test: command, so
         # respawning can only produce the same non-answer. Without it here the
         # issue stayed a candidate forever and burned its retries into a 🛑.
-        if echo "$labels" | grep -qE "^sf:ready-for-prod$|^sf:needs-debug$|^sf:test-skipped$"; then
+        if echo "$labels" | grep -qE "^sf:5-ready-for-prod$|^sf:5-needs-debug$|^sf:5-test-skipped$"; then
             log "[test] #$issue_num already tested, skipping"; continue
         fi
         spawn_test "$issue_num" || log "[test] failed to spawn for #$issue_num"
@@ -250,11 +250,11 @@ main() {
     log "Dispatcher started (PID $$) repo=$REPO dir=$REPO_DIR"
 
     process_stage "triage"  "sf-triage"    "sf-apply-label.sh"   "feedback/triage"                 "feedback/bug feedback/feature sf:spam"
-    process_stage "spec"    "sf-tospecs"   "sf-apply-spec.sh"    "feedback/bug feedback/feature"   "sf:spec"
-    process_stage "tickets" "sf-totickets" "sf-apply-tickets.sh" "sf:spec"                         "sf:tickets"
-    process_stage "plan"    "sf-plan"      "sf-apply-plan.sh"    "sf:tickets"                      "sf:plan-review sf:plan-approved"
-    process_dev    # 3b: sf:plan-approved -> worktree -> /sf-dev -> draft PR -> sf:implemented
-    process_test   # 4:  sf:implemented -> run .sf.yml test cmd -> sf:ready-for-prod | sf:needs-debug
+    process_stage "spec"    "sf-tospecs"   "sf-apply-spec.sh"    "feedback/bug feedback/feature"   "sf:1-spec"
+    process_stage "tickets" "sf-totickets" "sf-apply-tickets.sh" "sf:1-spec"                         "sf:2-tickets"
+    process_stage "plan"    "sf-plan"      "sf-apply-plan.sh"    "sf:2-tickets"                      "sf:3-plan-review sf:3-plan-approved"
+    process_dev    # 3b: sf:3-plan-approved -> worktree -> /sf-dev -> draft PR -> sf:4-implemented
+    process_test   # 4:  sf:4-implemented -> run .sf.yml test cmd -> sf:5-ready-for-prod | sf:5-needs-debug
 
     # Human-in-the-loop: act on Slack thread replies (merge/deploy/approve/close).
     # Best-effort; gated on SF_SLACK_ADMIN_USER inside the script (no-op if unset).

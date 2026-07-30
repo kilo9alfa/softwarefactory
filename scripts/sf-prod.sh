@@ -8,8 +8,8 @@ set -uo pipefail
 #   - runs the repo's .sf.yml `deploy:` command; the label is set from its EXIT
 #     CODE (no LLM decides success/failure)
 #   - then invokes /sf-prod to write a human-readable deploy report
-#   sf:ready-for-prod --(exit 0)--> sf:deployed (issue closed)
-#                     --(exit !=0)-> sf:deploy-failed
+#   sf:5-ready-for-prod --(exit 0)--> sf:6-deployed (issue closed)
+#                     --(exit !=0)-> sf:6-deploy-failed
 #
 # Usage: bash sf-prod.sh <issue-number>
 # Env: SF_REPO, SF_REPO_DIR, SF_WORKTREE_DIR
@@ -27,11 +27,11 @@ issue_num="${1:?usage: sf-prod.sh <issue-number>}"
 
 # Guards.
 current_labels=$(gh issue view "$issue_num" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
-if echo "$current_labels" | grep -qx "sf:deployed"; then
+if echo "$current_labels" | grep -qx "sf:6-deployed"; then
     log "Issue #$issue_num: already deployed, nothing to do"; exit 0
 fi
-if ! echo "$current_labels" | grep -qx "sf:ready-for-prod"; then
-    log "Issue #$issue_num: not sf:ready-for-prod — refusing to deploy"; exit 1
+if ! echo "$current_labels" | grep -qx "sf:5-ready-for-prod"; then
+    log "Issue #$issue_num: not sf:5-ready-for-prod — refusing to deploy"; exit 1
 fi
 
 # Check out the tested branch and read its deploy command.
@@ -69,14 +69,14 @@ summary=$(sed -n '/<!--DEPLOY-SUMMARY-->/,/<!--\/DEPLOY-SUMMARY-->/p' "$summary_
 log_tail=$(tail -n 40 "$prod_log")
 
 if [ "$rc" -eq 0 ]; then
-    gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:deployed"
+    gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:6-deployed"
     gh issue comment "$issue_num" --repo "$REPO" --body "$(printf '🏭🚀 **Shipped** (stage 5) — `%s` exited 0.\n\n%s' "$deploy_cmd" "$summary")" 2>/dev/null || true
     gh issue close "$issue_num" --repo "$REPO" --reason completed 2>/dev/null || true
     bash "$SCRIPT_DIR/sf-notify.sh" "🚀 Shipped #${issue_num} to production — issue closed" "$wt" >/dev/null 2>&1 || true
-    log "Issue #$issue_num -> sf:deployed (closed)"
+    log "Issue #$issue_num -> sf:6-deployed (closed)"
 else
-    gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:deploy-failed"
+    gh issue edit "$issue_num" --repo "$REPO" --add-label "sf:6-deploy-failed"
     gh issue comment "$issue_num" --repo "$REPO" --body "$(printf '🏭🔴 **Deploy FAILED** (stage 5) — `%s` exited %s.\n\n%s\n\n<details><summary>deploy log</summary>\n\n```\n%s\n```\n</details>' "$deploy_cmd" "$rc" "$summary" "$log_tail")" 2>/dev/null || true
     bash "$SCRIPT_DIR/sf-notify.sh" "🔴 Deploy FAILED for #${issue_num} — see the issue for the log" "$wt" >/dev/null 2>&1 || true
-    log "Issue #$issue_num -> sf:deploy-failed"
+    log "Issue #$issue_num -> sf:6-deploy-failed"
 fi
